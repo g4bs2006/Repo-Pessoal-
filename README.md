@@ -4,7 +4,7 @@ Base de conhecimento e ativos de trabalho para construção de **agentes de IA d
 
 ---
 
-## 📁 Estrutura do Repositório
+## Estrutura do Repositório
 
 | Pasta | Conteúdo |
 |---|---|
@@ -16,7 +16,7 @@ Base de conhecimento e ativos de trabalho para construção de **agentes de IA d
 
 ---
 
-## 🤔 Por que usar este repositório
+## Por que usar este repositório
 
 1. **Padrão consolidado e testado em produção** — a skill `agente-odontologico` (v3) captura tudo que foi aprendido em 9+ clínicas reais: estrutura de estágios SPIN, sistema de memória de longo prazo, retenção de cancelamentos, integração de agenda. Cada erro de produção já corrigido está documentado em `references/correcoes.md` para nunca se repetir.
 2. **Velocidade de entrega** — montar um agente novo do zero leva dias; com a skill + os exemplos de clínicas anteriores como referência, leva horas. O onboarding de uma clínica vira um checklist de perguntas (ver SKILL.md, Etapa 1).
@@ -25,7 +25,7 @@ Base de conhecimento e ativos de trabalho para construção de **agentes de IA d
 
 ---
 
-## 🚀 Como usar
+## Como usar
 
 ### 1. Clonar
 
@@ -100,7 +100,7 @@ Cada script tem no topo as variáveis de configuração (token da API, IDs de pa
 
 ---
 
-## 🔒 Segurança e Credenciais
+## Segurança e Credenciais
 
 - Arquivos `.env` **não são versionados** (ver `.gitignore`) — cada projeto precisa do seu `.env` criado localmente
 - Tokens e chaves de API nos arquivos versionados foram **mascarados** (`***REMOVIDO***`) — substitua pelos valores reais do seu cofre local ao usar
