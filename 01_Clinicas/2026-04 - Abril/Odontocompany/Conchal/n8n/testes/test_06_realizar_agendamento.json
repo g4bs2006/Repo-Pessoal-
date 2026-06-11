@@ -1,0 +1,7 @@
+{
+  "action": "realizar_agendamento",
+  "telefone_cliente": "19987654321",
+  "nome_cliente": "Maria Oliveira",
+  "data_iso": "2026-05-13T10:00:00",
+  "spin": "Paciente com dor no dente 36. Interessada em avaliação de implante. Agendado via IA."
+}

@@ -1,0 +1,154 @@
+const AUTH = 'Basic ' + Buffer.from('primeodontocenter:***API_KEY_REMOVIDA***').toString('base64')
+const SUBSCRIBER_ID = '43945422000142'
+const BUSINESS_ID = 6505624431493120
+const CODE_LINK = 75094
+const BASE = 'https://api.clinicorp.com/rest/v1'
+
+// A API Clinicorp pode retornar horÃ¡rios sem zero Ã  esquerda (ex: "8:0"), o que torna
+// a string de data invÃ¡lida para o Date constructor. Esta funÃ§Ã£o normaliza para "HH:MM".
+function normTime(t) {
+  if (!t) return ''
+  const [h, m] = t.split(':')
+  return `${String(Number(h)).padStart(2, '0')}:${String(Number(m || 0)).padStart(2, '0')}`
+}
+
+async function clinicorpFetch(url, options = {}) {
+  const res = await fetch(url, { ...options, headers: { Authorization: AUTH, 'Content-Type': 'application/json', ...options.headers } })
+  const text = await res.text()
+  let body = {}
+  try { body = JSON.parse(text) } catch { body = { raw: text } }
+  if (!res.ok) {
+    console.error(`[Clinicorp] ${options.method || 'GET'} ${url} â†’ ${res.status}`, JSON.stringify(body))
+  }
+  return { ok: res.ok, status: res.status, body }
+}
+
+async function findPatientByPhone(phone) {
+  const cleanPhone = phone ? phone.replace(/\D/g, '') : ''
+  if (!cleanPhone) return null
+
+  const { ok, body } = await clinicorpFetch(
+    `${BASE}/patient/get?subscriber_id=${SUBSCRIBER_ID}&Phone=${cleanPhone}`
+  )
+
+  const patient = Array.isArray(body) ? body[0] : body
+  if (ok && patient?.PatientId) {
+    console.log('[Clinicorp] Paciente encontrado, ID:', patient.PatientId)
+    return { patientId: patient.PatientId }
+  }
+  return null
+}
+
+async function createPatient(name, phone) {
+  const cleanPhone = phone ? phone.replace(/\D/g, '') : ''
+  const { ok, body } = await clinicorpFetch(`${BASE}/patient/create`, {
+    method: 'POST',
+    body: JSON.stringify({
+      subscriber_id: SUBSCRIBER_ID,
+      Name: name,
+      MobilePhone: cleanPhone,
+      IgnoreSameName: 'X',
+    })
+  })
+
+  if (ok && body.id) {
+    console.log('[Clinicorp] Paciente criado, ID:', body.id)
+    return { patientId: body.id }
+  }
+
+  console.warn('[Clinicorp] Falha ao criar paciente:', JSON.stringify(body))
+  return null
+}
+
+export default async function handler(req, res) {
+
+  // â”€â”€ GET: busca horÃ¡rios disponÃ­veis â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  if (req.method === 'GET') {
+    const date = req.query?.date
+    if (!date) return res.status(400).json({ error: 'ParÃ¢metro date obrigatÃ³rio (YYYY-MM-DD)' })
+
+    try {
+      const url = `${BASE}/appointment/get_avaliable_times_calendar?subscriber_id=${SUBSCRIBER_ID}&code_link=${CODE_LINK}&date=${date}`
+      const { ok, status, body } = await clinicorpFetch(url)
+
+      if (!ok) {
+        return res.status(status).json({
+          error: body.Message || body.message || 'Erro ao buscar horÃ¡rios no Clinicorp',
+          detail: body,
+        })
+      }
+
+      const raw = Array.isArray(body) ? body : (body.AvaliableTimes ?? [])
+      const slots = raw
+        .filter(s => s.isSelectable !== false)
+        .map(s => ({
+          from: normTime(s.From),
+          to: normTime(s.To),
+          professionalId: String(s.ProfessionalId),
+        }))
+
+      return res.status(200).json(slots)
+    } catch (err) {
+      console.error('[Clinicorp GET] exception:', err.message)
+      return res.status(500).json({ error: err.message })
+    }
+  }
+
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+
+  // â”€â”€ POST: busca/cria paciente e agenda â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const { patientName, patientPhone, dentistId, dateLocal, fromTime, toTime, notes } = req.body || {}
+
+  if (!patientName || !dentistId || !dateLocal || !fromTime || !toTime) {
+    return res.status(400).json({ error: 'Campos obrigatÃ³rios: patientName, dentistId, dateLocal, fromTime, toTime' })
+  }
+
+  try {
+    // Passo 1: buscar paciente pelo telefone
+    let patientResult = await findPatientByPhone(patientPhone)
+
+    if (!patientResult) {
+      // Passo 2: criar o paciente se nÃ£o existir
+      patientResult = await createPatient(patientName, patientPhone)
+    }
+
+    if (!patientResult) {
+      return res.status(400).json({ error: 'NÃ£o foi possÃ­vel encontrar ou criar o paciente no Clinicorp.' })
+    }
+
+    // Passo 3: criar o agendamento com o ID do paciente
+    const payload = {
+      Clinic_BusinessId: BUSINESS_ID,
+      Patient_PersonId: Number(patientResult.patientId),
+      Dentist_PersonId: Number(dentistId),
+      PatientName: patientName,
+      MobilePhone: patientPhone ? patientPhone.replace(/\D/g, '') : '',
+      date: `${dateLocal}T03:00:00.000Z`,
+      fromTime: fromTime,
+      toTime: toTime,
+      Notes: notes || 'Agendamento via Prime Agendamento',
+      CategoryColor: '#ffff00',
+      CategoryDescription: 'AVALIAÃ‡ÃƒO',
+    }
+
+    console.log('[Clinicorp POST] payload:', JSON.stringify(payload))
+
+    const { ok, status, body } = await clinicorpFetch(
+      `${BASE}/appointment/create_appointment_by_api`,
+      { method: 'POST', body: JSON.stringify(payload) }
+    )
+
+    if (!ok || body.isBusy) {
+      const errorMsg = body.msg || body.Message || body.message || body.error || `Erro ao criar agendamento (${status})`
+      console.error('[Clinicorp POST] resposta de erro:', JSON.stringify(body))
+      return res.status(400).json({ error: errorMsg, detail: body })
+    }
+
+    console.log('[Clinicorp POST] sucesso:', JSON.stringify(body))
+    return res.status(200).json({ success: true, data: body })
+
+  } catch (err) {
+    console.error('[Clinicorp POST] exception:', err.message)
+    return res.status(500).json({ error: err.message })
+  }
+}
