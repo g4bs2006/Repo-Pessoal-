@@ -109,4 +109,4 @@ Cada script tem no topo as variáveis de configuração (token da API, IDs de pa
 
 ---
 
-*Mantido por Gabriel Rodrigues — Contact.IA / Escala Odonto*
+*Mantido por Gabriel Rodrigues — Contact.IA / Escalar Odonto*
