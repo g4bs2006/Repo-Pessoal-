@@ -1,0 +1,2 @@
+Nome: EOV_BK_objecoes
+Quando usar: Consultar quando o lead apresentar objeção, resistência, dúvida sobre preço, medo de dentista, distância ou indecisão em agendar.
