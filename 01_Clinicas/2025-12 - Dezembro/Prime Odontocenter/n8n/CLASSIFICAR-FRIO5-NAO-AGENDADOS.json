@@ -1,0 +1,95 @@
+{
+  "name": "CLASSIFICAR-FRIO5-NAO-AGENDADOS",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-480, 0],
+      "id": "a1000001-0000-0000-0000-000000000001",
+      "name": "Executar Manualmente"
+    },
+    {
+      "parameters": {
+        "jsCode": "const https = require('https');\nconst BEARER = 'pn_22zvaOtn9H6mmwNKktsuKd91F8UDdLnuu085N5bw';\n\nfunction apiGet(path, params) {\n  return new Promise((resolve, reject) => {\n    let qs = '';\n    if (params) {\n      qs = '?' + Object.entries(params)\n        .map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v))\n        .join('&');\n    }\n    const req = https.request({\n      hostname: 'api.wts.chat',\n      path: path + qs,\n      method: 'GET',\n      headers: { Authorization: 'Bearer ' + BEARER }\n    }, res => {\n      let data = '';\n      res.on('data', c => data += c);\n      res.on('end', () => {\n        if (res.statusCode >= 400)\n          return reject(new Error('GET ' + path + ' -> ' + res.statusCode + ': ' + data));\n        try { resolve(JSON.parse(data)); }\n        catch(e) { reject(new Error(data.slice(0, 300))); }\n      });\n    });\n    req.on('error', reject);\n    req.end();\n  });\n}\n\nfunction apiPost(path, body) {\n  return new Promise((resolve, reject) => {\n    const bodyStr = JSON.stringify(body);\n    const req = https.request({\n      hostname: 'api.wts.chat',\n      path: path,\n      method: 'POST',\n      headers: {\n        Authorization: 'Bearer ' + BEARER,\n        'Content-Type': 'application/json',\n        'Content-Length': Buffer.byteLength(bodyStr)\n      }\n    }, res => {\n      let data = '';\n      res.on('data', c => data += c);\n      res.on('end', () => {\n        if (res.statusCode >= 400)\n          return reject(new Error('POST ' + path + ' -> ' + res.statusCode + ': ' + data));\n        try { resolve(JSON.parse(data)); }\n        catch(e) { reject(new Error(data.slice(0, 300))); }\n      });\n    });\n    req.on('error', reject);\n    req.write(bodyStr);\n    req.end();\n  });\n}\n\nconst PANEL_ID = 'fd4df083-7422-4171-9ee2-1c098e799798';\nconst STEPS = [\n  '57d98384-2435-44ef-ac72-a6ce13ea8843',\n  '481c3384-26e5-4a9e-9235-eeccfd506ad5'\n];\n\n// 1. Buscar tag frio 5\nconst tagsRaw = await apiGet('/core/v1/tag');\nconst tagList = Array.isArray(tagsRaw) ? tagsRaw : (tagsRaw.items || []);\nconst tagFrio5 = tagList.find(t => {\n  const n = (t.name || t.Name || t.title || '').toLowerCase();\n  return n.includes('frio') && n.includes('5');\n});\nif (!tagFrio5) {\n  const nomes = tagList.map(t => t.name || t.Name || '?').join(', ');\n  throw new Error('Tag frio 5 nao encontrada. Disponiveis: ' + nomes);\n}\nconst tagId = tagFrio5.id || tagFrio5.Id;\n\n// 2. Contatos com a tag\nconst contactIds = new Set();\nlet pgC = 1, maisC = true;\nwhile (maisC) {\n  const r = await apiPost('/core/v1/contact/filter', {\n    tagIds: [tagId], pageSize: 100, pageNumber: pgC\n  });\n  for (const c of (r.items || [])) contactIds.add(c.id);\n  maisC = r.hasMorePages === true;\n  pgC++;\n}\n\n// 3. Cards nao agendados x cruzamento\nconst resultado = [];\nfor (const stepId of STEPS) {\n  let pgCard = 1, maisCard = true;\n  while (maisCard) {\n    const r = await apiGet('/crm/v1/panel/card', {\n      PanelId: PANEL_ID, StepId: stepId, PageSize: 100, PageNumber: pgCard\n    });\n    for (const card of (r.items || [])) {\n      const cid = (card.contactIds || [])[0];\n      if (cid && contactIds.has(cid)) {\n        resultado.push({ json: {\n          card_id: card.id,\n          card_title: card.title || '',\n          contact_id: cid,\n          step_origem: card.stepTitle || stepId\n        }});\n      }\n    }\n    maisCard = r.hasMorePages === true;\n    pgCard++;\n  }\n}\n\nif (resultado.length === 0) {\n  return [{ json: {\n    status: 'nenhum_card_para_mover',\n    total_frio5: contactIds.size,\n    tag_id: tagId,\n    tag_nome: tagFrio5.name || tagFrio5.Name\n  }}];\n}\nreturn resultado;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-224, 0],
+      "id": "a1000002-0000-0000-0000-000000000002",
+      "name": "Buscar e Cruzar Frio 5"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.wts.chat/crm/v2/panel/card/{{ $json.card_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer ***TOKEN_REMOVIDO***"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"fields\": [\"stepId\"],\n  \"stepId\": \"f79387f8-56fb-4d51-811c-4a06d3511ab8\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [32, 0],
+      "id": "a1000003-0000-0000-0000-000000000003",
+      "name": "Mover para IA Nao Conseguiu",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "total_movidos",
+              "value": "={{ $input.all().length }}",
+              "type": "number"
+            },
+            {
+              "id": "r2",
+              "name": "cards_movidos",
+              "value": "={{ $input.all().map(i => i.json.card_id) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [288, 0],
+      "id": "a1000004-0000-0000-0000-000000000004",
+      "name": "Resumo Final"
+    }
+  ],
+  "connections": {
+    "Executar Manualmente": {
+      "main": [[{ "node": "Buscar e Cruzar Frio 5", "type": "main", "index": 0 }]]
+    },
+    "Buscar e Cruzar Frio 5": {
+      "main": [[{ "node": "Mover para IA Nao Conseguiu", "type": "main", "index": 0 }]]
+    },
+    "Mover para IA Nao Conseguiu": {
+      "main": [[{ "node": "Resumo Final", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

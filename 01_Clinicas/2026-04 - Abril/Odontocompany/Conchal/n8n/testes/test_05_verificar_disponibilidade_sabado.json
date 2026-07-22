@@ -1,0 +1,7 @@
+{
+  "action": "verificar_disponibilidade",
+  "telefone_cliente": "19987654321",
+  "nome_cliente": "Maria Oliveira",
+  "data_inicio": "2026-05-16T00:00:00",
+  "periodo_preferencia": "manha"
+}

@@ -1,0 +1,226 @@
+{
+  "name": "Helena CRM - Importar Planilha para Painel",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "node-01",
+      "name": "Início",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 400]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-token",
+              "name": "apiToken",
+              "value": "COLE_SEU_TOKEN_HELENA_AQUI",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-02",
+      "name": "Configuração",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 400]
+    },
+    {
+      "parameters": {
+        "operation": "readAllRows",
+        "documentId": {
+          "__rl": true,
+          "value": "COLE_O_ID_DA_PLANILHA_GOOGLE_SHEETS_AQUI",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "node-03",
+      "name": "Ler Planilha",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "node-04",
+      "name": "Processar Um por Um",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "function norm(str) {\n  return (str || '').toLowerCase().trim().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n}\n\nconst STEP_IDS = {\n  // Nomes originais Helena\n  'agendou':            'a3202605-7c42-487e-a206-32372c48d379',\n  'nao agendou':        'aa4432f7-881b-4656-b839-522b28063a98',\n  'faltou':             '313cc387-21b9-4fe9-aa2e-ebd03d1b586f',\n  'primeiro dia':       '70093584-337b-49d1-82a1-6278f879d9ac',\n  'segundo dia':        'ccf33c75-1e91-4d5e-a312-a190321687ab',\n  'terceiro dia':       '6847efed-d379-4623-afa1-fa873ab86cdc',\n  'nao fechou':         '42ee73a2-d18e-4987-bdd4-2d4dd8a61565',\n  'entrada programada': '7be52b52-6eaa-4f85-ba37-86f98e82cb6b',\n  'protocolo/pt':       'be2ce573-91cf-4fd3-a15c-ad1949e9d0d6',\n  'pacientes':          '403c21d7-da9d-4cdc-90e2-6e431976d65b',\n  // Aliases de outras planilhas\n  'acompanhamento':              '42ee73a2-d18e-4987-bdd4-2d4dd8a61565',\n  'nao fechou (follow)':         '42ee73a2-d18e-4987-bdd4-2d4dd8a61565',\n  'nao fechou (cadencia)':       '42ee73a2-d18e-4987-bdd4-2d4dd8a61565',\n  'primeiro contato':            'aa4432f7-881b-4656-b839-522b28063a98',\n  'nao agendados':               'aa4432f7-881b-4656-b839-522b28063a98',\n  'agendados':                   'a3202605-7c42-487e-a206-32372c48d379',\n  'faltantes':                   '313cc387-21b9-4fe9-aa2e-ebd03d1b586f',\n  'etapa de leads de entrada':   'aa4432f7-881b-4656-b839-522b28063a98',\n  'oportunidades futuras':       '7be52b52-6eaa-4f85-ba37-86f98e82cb6b',\n};\n\n// Tags do painel com IDs fixos\nconst TAG_MAP = [\n  { id: 'b7b1d25e-b187-40f4-a8a3-b74b0ea24cce', name: 'agendou consulta',  kw: ['agendou', 'agend', 'marcou'] },\n  { id: '0235c5e0-e855-4a09-812e-07dc932a3a3f', name: 'aparelho',           kw: ['aparelh', 'ortodont', 'bracket', 'braquete', 'alinhador'] },\n  { id: '0a809454-334d-4de3-bf10-80d4966b6acf', name: 'implante',           kw: ['implant'] },\n  { id: '9b36cde0-d33e-43b8-9836-d1d94d5efb58', name: 'indicacao',          kw: ['indicac', 'indica', 'referral', 'referencia'] },\n  { id: '6cef77ad-e39a-453c-a894-f30fd2aacff0', name: 'ja paciente',        kw: ['ja paciente', 'paciente atual', 'paciente antigo', 'retorno'] },\n  { id: '586fb4e1-f424-44f4-b147-9fd28b42b3a4', name: 'lead frio',          kw: ['frio', 'inativo', 'sem retorno', 'sem resposta', 'nao respondeu'] },\n  { id: 'eb0aa84b-35bc-4098-a81e-4ec7fbea5803', name: 'organico - instagram', kw: ['instagram', 'insta', 'organico', 'organic', 'trafego', 'lp'] },\n  { id: '3df59de0-edef-4c6b-b585-8671e934a863', name: 'placa',              kw: ['placa', 'plaquinha'] },\n  { id: 'c2d5872e-083a-4d6e-85f0-df921f685132', name: 'protese',            kw: ['protese', 'dentadura', 'coroa', 'cimentac', 'protocolo'] },\n  { id: '20bdc27a-a0a6-48e9-b5db-539ba1972318', name: 'servicos clinicos',  kw: ['servico', 'limpeza', 'profilax', 'restaura', 'extracao', 'canal', 'endodon'] },\n];\n\nfunction mapearTag(rawTag) {\n  const n = norm(rawTag);\n  for (const t of TAG_MAP) {\n    if (n === t.name) return t.id;\n  }\n  for (const t of TAG_MAP) {\n    if (t.kw.some(k => n.includes(k))) return t.id;\n  }\n  return null;\n}\n\nfunction resolverTagIds(tagsRaw) {\n  if (!tagsRaw || !String(tagsRaw).trim()) return [];\n  const partes = String(tagsRaw).split(/[,\\/;]|\\se\\s/i).map(t => t.trim()).filter(Boolean);\n  const resolved = new Set();\n  for (const parte of partes) {\n    const id = mapearTag(parte);\n    if (id) resolved.add(id);\n    else console.log('Tag nao mapeada: \"' + parte + '\"');\n  }\n  return [...resolved];\n}\n\nconst row = $input.item.json;\n\nlet telefone = String(row['Telefone comercial (contato)'] || '').replace(/\\D/g, '');\nif (telefone.startsWith('55') && telefone.length === 13) {\n  telefone = telefone.slice(2);\n}\n\nconst nome = row['Contato principal'] || 'Sem nome';\nconst titulo = telefone ? nome + ' | ' + telefone : nome;\n\nconst nomeEtapa = norm(row['Etapa do lead'] || '');\nconst stepId = STEP_IDS[nomeEtapa] || null;\n\nif (!stepId) {\n  console.log('AVISO: Etapa nao encontrada: \"' + nomeEtapa + '\"');\n}\n\nconst tagIds = resolverTagIds(row['Lead tags'] || '');\n\nreturn [{ json: {\n  nome,\n  titulo,\n  telefone,\n  tagIds,\n  descricao: row['Nota 1'] || '',\n  stepId\n}}];"
+      },
+      "id": "node-05",
+      "name": "Preparar Dados do Lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-stepid",
+              "leftValue": "={{ $json.stepId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "node-06",
+      "name": "Tem Etapa Válida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1340, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.wts.chat/core/v1/contact",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Configuração').first().json.apiToken }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ name: $json.nome, phoneNumber: $json.telefone, options: { getIfExists: true } }) }}",
+        "options": {}
+      },
+      "id": "node-07",
+      "name": "Criar ou Obter Contato",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 280]
+    },
+    {
+      "parameters": {
+        "jsCode": "const contactResp = $input.item.json;\nconst lead = $('Preparar Dados do Lead').item.json;\n\nconst contactId = contactResp?.id || null;\n\nconst cardPayload = {\n  stepId: lead.stepId,\n  title: lead.titulo,\n  description: lead.descricao || null,\n  tagIds: lead.tagIds\n};\nif (contactId) cardPayload.contactIds = [contactId];\n\nreturn [{ json: { ...lead, contactId, bodyString: JSON.stringify(cardPayload) } }];"
+      },
+      "id": "node-08",
+      "name": "Montar Payload do Card",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 280]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.wts.chat/crm/v1/panel/card",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Configuração').first().json.apiToken }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.bodyString }}",
+        "options": {}
+      },
+      "id": "node-09",
+      "name": "Criar Card",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 280],
+      "continueOnFail": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Início": {
+      "main": [
+        [{ "node": "Configuração", "type": "main", "index": 0 }]
+      ]
+    },
+    "Configuração": {
+      "main": [
+        [{ "node": "Ler Planilha", "type": "main", "index": 0 }]
+      ]
+    },
+    "Ler Planilha": {
+      "main": [
+        [{ "node": "Processar Um por Um", "type": "main", "index": 0 }]
+      ]
+    },
+    "Processar Um por Um": {
+      "main": [
+        [{ "node": "Preparar Dados do Lead", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Preparar Dados do Lead": {
+      "main": [
+        [{ "node": "Tem Etapa Válida?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Tem Etapa Válida?": {
+      "main": [
+        [{ "node": "Criar ou Obter Contato", "type": "main", "index": 0 }],
+        [{ "node": "Processar Um por Um", "type": "main", "index": 0 }]
+      ]
+    },
+    "Criar ou Obter Contato": {
+      "main": [
+        [{ "node": "Montar Payload do Card", "type": "main", "index": 0 }]
+      ]
+    },
+    "Montar Payload do Card": {
+      "main": [
+        [{ "node": "Criar Card", "type": "main", "index": 0 }]
+      ]
+    },
+    "Criar Card": {
+      "main": [
+        [{ "node": "Processar Um por Um", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

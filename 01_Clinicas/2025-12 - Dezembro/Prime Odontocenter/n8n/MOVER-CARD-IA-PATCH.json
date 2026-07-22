@@ -1,0 +1,28 @@
+{
+  "_instrucoes": {
+    "descricao": "Adicione estes nós ao workflow AGENDAMENTOS-PRIMEODONTOCENTER-CLINICORP existente.",
+    "conexao": "Conecte 'Agendar Na Clinicorp' (id: ac648c70-...) TAMBÉM para 'Mover Card para IA no Helena'. O nó de resposta ao webhook já existe e não muda — esta é uma segunda saída paralela do mesmo nó.",
+    "posicao_sugerida": "Coloque os novos nós abaixo da linha principal, ex: y=820"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// ── Mover Card para IA no Helena ─────────────────────────────────────\n// Após agendamento confirmado no Clinicorp, localiza o card do paciente\n// no painel Helena (Meta ou Orgânico) e move para 'Agendado pela IA'.\n\nconst BEARER  = 'pn_22zvaOtn9H6mmwNKktsuKd91F8UDdLnuu085N5bw';\nconst BASE    = 'https://api.wts.chat';\nconst IA_STEP = '096ecc8b-c84e-4f20-9df8-bc684c6dff45';\nconst PANELS  = [\n  'fd4df083-7422-4171-9ee2-1c098e799798', // Meta\n  '481c3384-26e5-4a9e-9235-eeccfd506ad5', // Orgânico\n];\nconst HEADERS = { Authorization: `Bearer ${BEARER}` };\n\nconst telefone = $('Configuracao Unidades').first().json.telefone_limpo;\n\n// 1. Buscar contato pelo telefone\nlet contactId = null;\ntry {\n  const res = await $helpers.httpRequest({\n    method:  'GET',\n    url:     `${BASE}/core/v1/contact`,\n    headers: HEADERS,\n    qs:      { Phone: telefone, PageSize: 1 },\n  });\n  contactId = res.items?.[0]?.id ?? null;\n} catch(e) {}\n\nif (!contactId) {\n  return [{ json: { status: 'contato_nao_encontrado', telefone } }];\n}\n\n// 2. Localizar card ativo em qualquer dos painéis\nlet cardId = null;\nfor (const panelId of PANELS) {\n  try {\n    const res = await $helpers.httpRequest({\n      method:  'GET',\n      url:     `${BASE}/crm/v1/panel/card`,\n      headers: HEADERS,\n      qs:      { PanelId: panelId, ContactId: contactId, PageSize: 10 },\n    });\n    const card = (res.items || []).find(c => !c.archived);\n    if (card) { cardId = card.id; break; }\n  } catch(e) {}\n}\n\nif (!cardId) {\n  return [{ json: { status: 'card_nao_encontrado', contactId } }];\n}\n\n// 3. Mover para o step 'Agendado pela IA'\ntry {\n  await $helpers.httpRequest({\n    method:  'PUT',\n    url:     `${BASE}/crm/v2/panel/card/${cardId}`,\n    headers: { ...HEADERS, 'Content-Type': 'application/json' },\n    body:    { fields: ['stepId'], stepId: IA_STEP },\n  });\n  return [{ json: { status: 'sucesso', cardId, stepMovido: IA_STEP } }];\n} catch(e) {\n  return [{ json: { status: 'erro_ao_mover', cardId, erro: e.message } }];\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1984, 820],
+      "id": "3c4d5e6f-a7b8-9c0d-1e2f-3a4b5c6d7e8f",
+      "name": "Mover Card para IA no Helena"
+    }
+  ],
+  "connections_a_adicionar": {
+    "Agendar Na Clinicorp": {
+      "main": [
+        [{ "node": "Resp: Sucesso Agendamento",    "type": "main", "index": 0 }],
+        [{ "node": "Mover Card para IA no Helena", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "_nota": "O nó 'Mover Card para IA no Helena' não bloqueia a resposta ao webhook. A resposta já foi enviada por 'Resp: Sucesso Agendamento'. Este nó roda em paralelo sem impacto no tempo de resposta."
+}

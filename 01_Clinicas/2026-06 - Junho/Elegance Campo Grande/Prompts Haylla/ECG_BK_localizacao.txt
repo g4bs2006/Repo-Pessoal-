@@ -1,0 +1,2 @@
+Nome: ECG_BK_localizacao
+Quando usar: Consultar quando o lead perguntar sobre endereço, como chegar, horários de funcionamento, telefone ou redes sociais da clínica.
