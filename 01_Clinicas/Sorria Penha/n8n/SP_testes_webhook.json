@@ -1,0 +1,166 @@
+{
+  "webhook_url": "https://SEU-HOST-N8N/webhook/agendamentos-sorria-penha",
+  "observacao": "Trocar SEU-HOST-N8N pela URL real do n8n. Todos os testes são POST com Content-Type application/json. tipo_agenda aceita: penha, recreio, caxias.",
+  "testes": [
+    {
+      "descricao": "1. Verificar disponibilidade — Penha, sondagem de período (manhã), sem horário específico",
+      "acao_fluxo": "verificar_disponibilidade",
+      "unidade": "penha",
+      "body": {
+        "action": "verificar_disponibilidade",
+        "tipo_agenda": "penha",
+        "nome_cliente": "Marina Alves da Silva",
+        "telefone_cliente": "21999990355",
+        "periodo_preferencia": "manha"
+      }
+    },
+    {
+      "descricao": "2. Verificar disponibilidade — Recreio, horário específico pedido pelo lead",
+      "acao_fluxo": "verificar_disponibilidade",
+      "unidade": "recreio",
+      "body": {
+        "action": "verificar_disponibilidade",
+        "tipo_agenda": "recreio",
+        "nome_cliente": "João Pedro Nascimento",
+        "telefone_cliente": "21987654321",
+        "data_iso": "2026-08-11T14:00:00"
+      }
+    },
+    {
+      "descricao": "3. Verificar disponibilidade — Caxias, período tarde",
+      "acao_fluxo": "verificar_disponibilidade",
+      "unidade": "caxias",
+      "body": {
+        "action": "verificar_disponibilidade",
+        "tipo_agenda": "caxias",
+        "nome_cliente": "Camila Ferreira Souza",
+        "telefone_cliente": "21998887766",
+        "periodo_preferencia": "tarde"
+      }
+    },
+    {
+      "descricao": "4. Verificar disponibilidade — teste de feriado (não deve oferecer 07/09/2026, Independência)",
+      "acao_fluxo": "verificar_disponibilidade",
+      "unidade": "penha",
+      "body": {
+        "action": "verificar_disponibilidade",
+        "tipo_agenda": "penha",
+        "nome_cliente": "Teste Feriado",
+        "telefone_cliente": "21900000000",
+        "data_iso": "2026-09-07T10:00:00"
+      }
+    },
+    {
+      "descricao": "5. Realizar agendamento — Penha (fluxo completo do Pacto de Honra confirmado)",
+      "acao_fluxo": "realizar_agendamento",
+      "unidade": "penha",
+      "body": {
+        "action": "realizar_agendamento",
+        "tipo_agenda": "penha",
+        "nome_cliente": "Marina Alves da Silva",
+        "telefone_cliente": "21999990355",
+        "data_nascimento": "14/03/1990",
+        "data_iso": "2026-08-10T10:00:00",
+        "spin": "Avaliação sem custo, dor estética (vergonha de sorrir em fotos), urgência baixa."
+      }
+    },
+    {
+      "descricao": "6. Realizar agendamento — Recreio",
+      "acao_fluxo": "realizar_agendamento",
+      "unidade": "recreio",
+      "body": {
+        "action": "realizar_agendamento",
+        "tipo_agenda": "recreio",
+        "nome_cliente": "João Pedro Nascimento",
+        "telefone_cliente": "21987654321",
+        "data_nascimento": "22/07/1985",
+        "data_iso": "2026-08-11T14:00:00",
+        "spin": "Dor de mastigação, prótese solta, urgência alta."
+      }
+    },
+    {
+      "descricao": "7. Realizar agendamento — Caxias",
+      "acao_fluxo": "realizar_agendamento",
+      "unidade": "caxias",
+      "body": {
+        "action": "realizar_agendamento",
+        "tipo_agenda": "caxias",
+        "nome_cliente": "Camila Ferreira Souza",
+        "telefone_cliente": "21998887766",
+        "data_nascimento": "05/01/2018",
+        "data_iso": "2026-08-12T15:00:00",
+        "spin": "Atendimento infantil, criança de 8 anos, primeira avaliação."
+      }
+    },
+    {
+      "descricao": "8. Realizar agendamento — teste de erro (horário fora do expediente, Caxias 08h00 é antes de abrir)",
+      "acao_fluxo": "realizar_agendamento",
+      "unidade": "caxias",
+      "body": {
+        "action": "realizar_agendamento",
+        "tipo_agenda": "caxias",
+        "nome_cliente": "Teste Fora Do Expediente",
+        "telefone_cliente": "21900000001",
+        "data_nascimento": "01/01/2000",
+        "data_iso": "2026-08-12T08:00:00",
+        "spin": "Teste de validação de horário inválido."
+      }
+    },
+    {
+      "descricao": "9. Cancelar agendamento — Recreio (após 5 já ter marcado no teste 6)",
+      "acao_fluxo": "cancelar_agendamento",
+      "unidade": "recreio",
+      "body": {
+        "action": "cancelar_agendamento",
+        "tipo_agenda": "recreio",
+        "nome_cliente": "João Pedro Nascimento",
+        "telefone_cliente": "21987654321",
+        "data_iso": "2026-08-11T14:00:00"
+      }
+    },
+    {
+      "descricao": "10. Remarcar agendamento — Penha (mover do teste 5 para novo horário)",
+      "acao_fluxo": "remarcar_agendamento",
+      "unidade": "penha",
+      "body": {
+        "action": "remarcar_agendamento",
+        "tipo_agenda": "penha",
+        "nome_cliente": "Marina Alves da Silva",
+        "telefone_cliente": "21999990355",
+        "data_antiga": "10/08/2026 10:00",
+        "data_iso": "2026-08-13T11:00:00"
+      }
+    },
+    {
+      "descricao": "11. Verificar agendamento do paciente — Caxias (deve encontrar o do teste 7)",
+      "acao_fluxo": "verificar_agendamento_paciente",
+      "unidade": "caxias",
+      "body": {
+        "action": "verificar_agendamento_paciente",
+        "tipo_agenda": "caxias",
+        "nome_cliente": "Camila Ferreira Souza",
+        "telefone_cliente": "21998887766"
+      }
+    },
+    {
+      "descricao": "12. Verificar agendamento do paciente — telefone sem nenhum agendamento (deve retornar nao_encontrado)",
+      "acao_fluxo": "verificar_agendamento_paciente",
+      "unidade": "penha",
+      "body": {
+        "action": "verificar_agendamento_paciente",
+        "tipo_agenda": "penha",
+        "nome_cliente": "Paciente Sem Agenda",
+        "telefone_cliente": "21900000002"
+      }
+    }
+  ],
+  "ordem_sugerida_de_execucao": [
+    "Rodar os testes 1 a 4 primeiro (somente leitura, não criam eventos).",
+    "Rodar 5, 6 e 7 para criar agendamentos reais nas 3 unidades.",
+    "Rodar 8 para confirmar que horário inválido é rejeitado (não deve criar evento).",
+    "Rodar 11 e 12 para validar a verificação de agendamento.",
+    "Rodar 10 para testar remarcação do agendamento criado no teste 5.",
+    "Rodar 9 para testar cancelamento do agendamento criado no teste 6.",
+    "Conferir manualmente nos 3 Google Calendars que os eventos batem com o esperado, e no Supabase (tabela metricas_ia) que os logs foram gravados."
+  ]
+}

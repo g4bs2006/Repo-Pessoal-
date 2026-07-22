@@ -1,0 +1,288 @@
+# ROADMAP DE PRODUTO — Plataforma Contact (Escala Agenda 2.0)
+
+> **Versão:** 1.0 · **Data:** 15/06/2026 · **Autor:** Arquitetura de Projetos
+> **Base:** `requisitos-do-sistema.md` (RFs/RNFs/RIs) + `arquitetura-e-componentes.md` (8 ADRs, módulos, fluxos) + `BACKLOG.md` (13 épicos / 29 stories / 34 tasks da Fase 1)
+> **Projeto-base:** `Agenda---Contact-` (Next.js 16.2.6 + React 19 + TS 5 + Tailwind 4 + Supabase PG17) — stack validada, fit alto.
+> **Time:** 3 devs (André Pujol — Pleno; Gabriel — Júnior; Daniel — Júnior).
+
+---
+
+## FASE 3 — JORNADA DO PRODUTO (Roadmap de Releases)
+
+### Reasoning (como cheguei a este roadmap)
+
+A documentação já traz um faseamento de 3 fases e 13 épicos com dependências mapeadas. Meu trabalho aqui **não é reinventar** isso, e sim transformar essa estrutura técnica numa **jornada de produto** — sequência de releases em que cada uma é utilizável e entregável por si só, com valor visível ao cliente e critério objetivo para liberar a próxima.
+
+Critérios que orientaram o recorte:
+
+1. **Gargalo manda na ordem.** O BACKLOG é explícito: `EPIC-02` (Card Sync Engine + Outbox + Webhooks) é o gargalo crítico — agenda, kanban e paciente 360° dependem dele. E `EPIC-00` (fundação: segurança/secrets/migrations) destrava tudo. Logo, R0 = EPIC-00 + EPIC-01 (config/espelho/tags), e o núcleo de sync (EPIC-02) abre a R1.
+
+2. **MVP = primeira vez que o cliente vê valor end-to-end.** A dor central declarada na visão é: *"cada ação na agenda move automaticamente o card no painel, e o cliente opera o funil num kanban próprio sem abrir a Helena"*. Isso só existe quando agenda → engine → kanban fecham o ciclo. Por isso o **MVP é a R1**, não a R0. R0 sozinha é base técnica invisível ao cliente (correto que seja a menor release possível).
+
+3. **Time pequeno e júnior dominante → releases menores e sequenciais no caminho crítico.** Com 2 juniores e 1 pleno, releases grandes com muitas frentes paralelas no núcleo de sync seriam arriscadas. Separo o núcleo sensível (sync, single writer, anti-loop — sênior/Gabriel com revisão reforçada) das trilhas visuais paralelizáveis (front — Daniel) e da integração/config/automação (André). O `revisor-entregas` é gate obrigatório em toda entrega, o que mitiga o risco #1 do Gabriel (aceitar sugestão de IA sem revisar).
+
+4. **100% dos RFs mapeados.** Validei que todos os RF-001..070 caem em alguma release. Nada fica no limbo; o que é explicitamente fora-de-escopo (fintech/Asaas, prontuário, app nativo, agendamento público) está declarado nos requisitos §2.2 e permanece fora do produto nesta versão.
+
+5. **Pendências técnicas viram pré-condições de release, não bloqueios silenciosos.** PEND-2 (Vault vs pgcrypto) é decidida dentro da R0. PEND-3 (5 status × 9 etapas — estados derivados) é decidida dentro da R1 (TASK-022). R2 (webhooks Helena reais) é uma PoC dentro da R1.
+
+6. **Segurança, escalabilidade e ITIL em cada release.** A ação de segurança #1 (rotacionar token Helena) é o primeiro item da R0. RLS multi-tenant, secrets server-side, RBAC e auditoria entram desde a fundação. ITIL (incidentes/mudanças/monitoramento) aparece como critério operacional a cada corte de release.
+
+### Examples (recorte aplicado)
+
+- **R0 (Fundação):** não há tela nova para o cliente; o "entregável" é o ambiente seguro e o esquema de dados de pé. Exemplo de critério de avanço verificável: *"token antigo retorna 401, novo retorna 200; `get_advisors` sem alerta de RLS nas novas tabelas; espelho de painéis populado e batendo a contagem por etapa com o painel real da Helena"*.
+- **R1 (MVP):** exemplo do valor visível — *"a recepcionista clica 'Cancelar' na agenda e o card sai de AGENDADOS e entra em CANCELOU no kanban próprio em ≤5s, sem tocar na Helena"*.
+
+### Conclusion
+
+A jornada tem **6 releases (R0 a R5)**. O **MVP demonstrável ao cliente é a R1**. R0 é a menor fundação possível que deixa o time produtivo. As releases seguem o caminho crítico do BACKLOG, com trilhas visuais em paralelo. Detalhe completo abaixo.
+
+---
+
+## 1. RESUMO DA JORNADA
+
+| Release | Tema | Valor entregue ao cliente | Épicos / RFs | Critério de avanço (verificável) | Tamanho p/ time de 3 |
+|---|---|---|---|---|---|
+| **R0** | Fundação segura + espelho Helena | (Invisível ao cliente) Base segura e dados de pé; admin já conecta a conta à Helena e vê o painel espelhado | EPIC-00, EPIC-01 · RNF-010/011/014, RF-020/021/025, RI-001/003, ADR 1/7/8 | Token rotacionado (antigo→401); migrations + RLS sem alerta `get_advisors`; espelho populado batendo contagem por etapa com o painel real; tags vinculadas | **P–M** (sequencial, 1 frente crítica + 2 paralelas) |
+| **R1 — MVP** | Agenda dinâmica ↔ Kanban próprio (sync vivo) | Cliente opera o funil inteiro no kanban Contact; cada ação na agenda move o card automaticamente; clica no paciente e vê a ficha 360° | EPIC-02, EPIC-03, EPIC-04, EPIC-05 · RF-001..013, RF-022..024 | Agendar/cancelar/comparecer move card ≤5s; card movido na Helena reflete ≤10s sem loop; kanban opera sem abrir Helena; 1 clique abre ficha 360° | **G** (núcleo crítico + 3 trilhas) |
+| **R2** | Abertura para automação (API pública + n8n migrado) | Integrações e o agente de IA passam a operar via plataforma (single writer real); n8n não toca mais na Helena | EPIC-06 · RF-060, RF-070, RNF-012 | OpenAPI navegável; n8n move card via `/api/v1/...`; nenhuma escrita direta n8n→Helena; RBAC bloqueia no backend (403) | **M** |
+| **R3** | Inteligência de gestão (Dashboard de Leads) | Gestor vê KPIs do funil, conversão por etapa, ticket médio, ranking CRC e IA×humano com filtros | EPIC-07 · RF-030..033, RNF-001 | KPIs batem com contagem de cards no período; filtros recalculam <2s; gráficos aprovados em revisão de design | **M** |
+| **R4** | Operação proativa (Lembrete D-1 + webhooks de saída) | Confirmação automática D-1 por WhatsApp atualiza status/card; integradores recebem eventos sem polling | EPIC-08, EPIC-09 · RF-050, RF-051, RF-061 | Consulta de amanhã gera lembrete; resposta do paciente atualiza status+card sem ação humana; n8n recebe evento ≤10s | **M** |
+| **R5** | Visão financeira (Clinicorp + Dashboard Financeiro) | Admin vê faturamento, fluxo de caixa, inadimplentes (com cobrança WhatsApp), forecast; financeiro na ficha do paciente | EPIC-10, EPIC-11, EPIC-12 · RF-014, RF-040..044 | Valores batem com Clinicorp na sync; financeiro só admin (backend); cobrança envia ao paciente certo com log | **G** |
+
+**Mapeamento de cobertura dos RFs (100%):** R0 cobre RF-020/021/025. R1 cobre RF-001..013, RF-022..024, RF-026. R2 cobre RF-060/070. R3 cobre RF-030..033. R4 cobre RF-050/051/061. R5 cobre RF-014, RF-040..044. **Nenhum RF fica fora.** Fora do produto (declarado em requisitos §2.2): fintech/Asaas, prontuário clínico, app nativo, agendamento público, edição da estrutura de etapas na nossa UI.
+
+---
+
+## 2. RELEASES DETALHADAS
+
+---
+
+### R0 — FUNDAÇÃO SEGURA + ESPELHO HELENA
+
+**Objetivo:** preparar o terreno seguro e os dados antes de qualquer funcionalidade visível. É a **menor release possível** que deixa o time produtivo — sem ela, ninguém consegue codar sync, kanban ou agenda com integração.
+
+**O que o cliente passa a conseguir fazer:** quase nada visível ainda — apenas o admin conecta a conta à Helena, seleciona o painel, mapeia as 9 etapas e vincula as tags. O kanban ainda não existe; o espelho já está populado nos bastidores. (É correto que R0 seja "invisível": ela é fundação.)
+
+**Stories incluídas (referência ao BACKLOG):**
+- **EPIC-00 — Fundação:** STORY-0.1 (segurança de credenciais — TASK-001/002), STORY-0.2 (esquema do espelho/outbox/webhooks + alter tabelas — TASK-003/004/005).
+- **EPIC-01 — Integração Helena:** STORY-1.1 (cliente Helena painel/card/tag — TASK-010), STORY-1.2 (config + vínculo de tags — TASK-011/012/013), STORY-1.3 (carga inicial do espelho — TASK-014).
+
+**Dependências:** nenhuma externa — é o ponto de partida. Internamente: TASK-001 → 002 → 003 → 004/005; TASK-010 depende de 002; TASK-014 depende de 010/003/011.
+
+**Riscos:**
+- **R4 — Token Helena exposto** (ativo). Mitigação: TASK-001 é o item #1 absoluto.
+- **R3 — Tags são UUIDs pré-criados manualmente na Helena** (API não cria). Mitigação: TASK-012 (pré-requisito humano, paralelo) precisa começar no dia 1.
+- **R5 — Prefixos de path Helena divergentes** (`/core/v1` vs `/crm/v2`). Mitigação: confirmar por endpoint na TASK-010 antes de generalizar.
+- **PEND-2 — Vault vs pgcrypto.** Decidir dentro desta release (TASK-002): verificar se o Vault está habilitado; se não, `pgcrypto`.
+
+**Segurança / Escalabilidade / ITIL:** rotação de token + secrets cifrados por conta (server-side only); RLS por `account_id` em todas as tabelas novas (multi-tenant desde a base); `get_advisors` como gate de segurança. ITIL: registrar a rotação do token como uma *mudança* documentada; `sync_log` e `audit_log` nascem aqui como base de rastreabilidade.
+
+> **CRITÉRIO DE AVANÇO (R0 → R1):**
+> 1. Token Helena antigo retorna **401**; novo retorna **200** via `@/lib/helena.ts`; nenhum token em repo/cliente.
+> 2. Migrations aplicadas; **`get_advisors` sem alerta de RLS** nas novas tabelas; tipos regenerados.
+> 3. `account_integrations` lê só server-side (cliente recebe vazio/403).
+> 4. **Espelho populado:** após `syncPanel`, a contagem de cards por etapa no `helena_cards` **bate com o painel real** da Helena; as 9 etapas aparecem na ordem correta.
+> 5. Tags listadas via `GET /v1/tag` e vinculadas (UUID↔família) na tela de config.
+
+---
+
+### R1 — MVP: AGENDA DINÂMICA ↔ KANBAN PRÓPRIO (SYNC VIVO)
+
+> **ESTA É A RELEASE QUE É O MVP DEMONSTRÁVEL AO CLIENTE.** É a primeira que entrega valor visível end-to-end: **agendar → card move → ver no kanban próprio → clicar no paciente → ficha 360°**, tudo sem abrir a Helena.
+
+**Objetivo:** ligar a agenda ao funil através da Card Sync Engine (single writer, ADR 7) e dar ao cliente a UX própria (agenda corrigida + kanban Contact + paciente 360°).
+
+**O que o cliente passa a conseguir fazer:**
+- Agendar numa **grade visual de slots** (sem digitar horário), com bloqueios renderizados, filtros de unidade/procedimento, durações dinâmicas e aviso de conflito antes de confirmar.
+- Usar **ações rápidas** (Confirmar/Compareceu/Faltou/Cancelar/Reagendar/Fechou com valor) — cada uma **move o card** automaticamente no funil.
+- Operar o **funil inteiro num kanban Contact** (9 colunas), arrastando cards (que movem na Helena via engine), com Realtime.
+- Abrir a **ficha 360°** de qualquer paciente com 1 clique (dados, histórico, etapa no funil, vínculo Helena) e mover a etapa dali.
+- Ver mudanças feitas na Helena/n8n refletidas no kanban (sync inbound).
+
+**Stories incluídas:**
+- **EPIC-02 (núcleo crítico):** STORY-2.1 (Outbox Worker + fallback — TASK-020/021), STORY-2.2 (Card Sync Engine outbound + domain events — TASK-022/023), STORY-2.3 (Webhook Receiver + inbound anti-loop — TASK-026/024/025).
+- **EPIC-03 (agenda):** STORY-3.1 (slots visuais + durações — TASK-030/031), STORY-3.2 (bloqueios + filtros — TASK-032/033), STORY-3.3 (conflito pré-confirmação + ações rápidas — TASK-034/035; DnD TASK-036 é *Could* — pode escorregar para o fim).
+- **EPIC-04 (kanban):** STORY-4.1 (tokens de marca + board 9 colunas — TASK-040/041/042), STORY-4.2 (DnD via engine + modal do card — TASK-043/044).
+- **EPIC-05 (paciente 360°):** STORY-5.1 (vínculo Helena — TASK-050), STORY-5.2 (drawer 360° — TASK-051).
+
+**Dependências:** R0 concluída (espelho + secrets + tags). Caminho crítico interno: TASK-020 → 022 → 023 → (035 / 043 / 051). As partes **visuais puras** (TASK-032 bloqueios, TASK-033 filtros, TASK-040 tokens) podem começar em paralelo com mocks enquanto o núcleo de sync é construído.
+
+**Riscos:**
+- **R1 (BACKLOG) — `PUT /crm/v2/panel/card/{id}` pode não mover etapa em alguns painéis.** Mitigação: fallback duplicate/delete+create (TASK-021). Validado na Salutar, mas confirmar por conta.
+- **R2 (BACKLOG) — eventos reais de webhook Helena não inventariados.** Mitigação: TASK-026 (PoC) antes de codar o receiver.
+- **PEND-3 — 5 status de appointment × 9 etapas do funil (estados derivados).** Decidir a modelagem dentro da TASK-022 (desfechos "fechou/não fechou/reagendado/não agendado" derivados, não status nativos).
+- **Risco de equipe — o núcleo de sync é sênior-level e cai num time com 2 juniores.** Mitigação: alocar Gabriel no núcleo com **revisão reforçada** e André como par técnico; `revisor-entregas` obrigatório.
+
+**Segurança / Escalabilidade / ITIL:** anti-loop por `origin` (platform/helena/n8n); idempotência de webhooks por `helena_event_id`; outbox com retry ×5 + badge "sync pendente" (degradação graciosa — agenda nunca bloqueia por falha de sync, RNF-031). ITIL: o `sync_log` vira a base de gestão de incidentes de sincronização; badge na UI é o primeiro sinal de alerta operacional.
+
+> **CRITÉRIO DE AVANÇO (R1 → R2):**
+> 1. **End-to-end vivo:** agendar/cancelar/comparecer/fechar na agenda move o card para a etapa correta **≤5s** (RNF-002).
+> 2. **Inbound sem loop:** card movido na Helena reflete no kanban **≤10s**, idempotente, sem reenfileirar outbound.
+> 3. **Kanban autônomo:** cliente opera as 9 etapas sem nunca abrir a interface da Helena; contagem/soma por coluna corretas.
+> 4. **Paciente 360°:** 1 clique (agenda/lista/card) abre a ficha; histórico ordenado; mover etapa pela ficha reflete no kanban e na Helena.
+> 5. **Resiliência:** falha de escrita gera retry e badge; agenda continua operando com Helena fora.
+> 6. **Validado com usuários reais** (CRC operando 1 dia sem abrir a Helena) e **estável em produção**.
+
+---
+
+### R2 — ABERTURA PARA AUTOMAÇÃO (API PÚBLICA + n8n MIGRADO)
+
+**Objetivo:** consolidar o RBAC no backend e expor a API pública v1 documentada, completando o ADR 7 (single writer real) ao migrar o n8n para escrever via plataforma — fechando o ciclo de segurança aberto na R0 (remover o token Helena do n8n).
+
+**O que o cliente passa a conseguir fazer:** do ponto de vista da operação humana, pouco muda na tela — o ganho é de **integridade e governança**: o agente de IA e qualquer integração passam a operar pela plataforma; nada mais escreve direto na Helena; permissões são garantidas no backend.
+
+**Stories incluídas:**
+- **EPIC-06:** STORY-6.1 (RBAC consolidado — TASK-060), STORY-6.2 (API v1 + escopos + OpenAPI + migração n8n — TASK-061/062/063).
+
+**Dependências:** R1 (a engine que a API expõe precisa existir). TASK-061 depende de 060/022/023; TASK-063 fecha o ciclo da TASK-001 (token Helena removido do n8n).
+
+**Riscos:** migração do n8n em produção (workflow externo, escrita real). Mitigação: validar em conta de teste que agendamento via IA cria card com `AGENDADO IA` + descrição estruturada antes de cortar o tráfego.
+
+**Segurança / Escalabilidade / ITIL:** RBAC no backend (defesa em profundidade, não só UI — RNF-012); API Key bcrypt com escopos por grupo; rate limit (429) e erros padronizados `{code,message}`. ITIL: a partir daqui, toda automação tem log centralizado na plataforma (auditoria e rastreio de mudanças via API).
+
+> **CRITÉRIO DE AVANÇO (R2 → R3):**
+> 1. OpenAPI **navegável** publicada; descreve auth por API Key e escopos.
+> 2. **n8n move card via `/api/v1/panel-cards/move`** — zero escritas diretas n8n→Helena (token Helena removido do n8n).
+> 3. RBAC: não-admin recebe **403** em rotas admin (verificado no backend).
+
+---
+
+### R3 — INTELIGÊNCIA DE GESTÃO (DASHBOARD DE LEADS)
+
+**Objetivo:** transformar o espelho de cards em métricas de gestão — o primeiro grande valor analítico para o gestor.
+
+**O que o cliente passa a conseguir fazer:** ver KPIs do funil (leads, agendados, conversão por etapa, ticket médio, valor fechado, orçamentos em aberto = COMPARECIDO), filtrar por período/unidade/CRC/IA-humano e analisar gráficos elaborados (funil, série temporal, ranking CRC, IA×humano, por unidade) com drill-down.
+
+**Stories incluídas (a detalhar pelo task-producao no início da release):**
+- **EPIC-07:** STORY-7.1 (KPIs — RF-030), STORY-7.2 (filtros <2s — RF-031), STORY-7.3 (gráficos + drill-down — RF-032), STORY-7.4 (acesso a todos os perfis — RF-033).
+- **Infra-chave:** Metrics Service (views materializadas/RPC sobre `helena_cards` por etapa×período×etiqueta), hook `useMetrics`, tela `dashboards/leads`.
+
+**Dependências:** R1 (espelho de cards + tags vinculadas alimentam as métricas) e R0 (tag_links são as dimensões de filtro).
+
+**Riscos:** performance das agregações (RNF-001, p95 <2s). Mitigação: ler sempre do espelho local, nunca da Helena; views materializadas com refresh por evento + agendado.
+
+**Segurança / Escalabilidade / ITIL:** leitura só do espelho (RNF-001); dashboard de leads é visível a todos os perfis autenticados (RF-033). ITIL: monitorar latência das queries de métricas como indicador de capacidade.
+
+> **CRITÉRIO DE AVANÇO (R3 → R4):**
+> 1. KPIs **batem com a contagem de cards** por etapa no período filtrado.
+> 2. Qualquer combinação de filtros recalcula **<2s** (RNF-001).
+> 3. Gráficos **aprovados em revisão de design** (identidade Contact); drill-down abre cards filtrados.
+
+---
+
+### R4 — OPERAÇÃO PROATIVA (LEMBRETE D-1 + WEBHOOKS DE SAÍDA)
+
+**Objetivo:** automatizar a confirmação de consultas e abrir eventos de saída para integradores.
+
+**O que o cliente passa a conseguir fazer:** o sistema envia lembrete D-1 por WhatsApp; a resposta do paciente atualiza status e card automaticamente; integradores assinam eventos da plataforma (consulta criada/cancelada, card movido, fechou) sem polling.
+
+**Stories incluídas (a detalhar no início da release):**
+- **EPIC-08:** STORY-8.1 (lembrete D-1 via Automation Scheduler/cron — RF-050), STORY-8.2 (resposta do paciente atualiza status+card via agente IA + engine — RF-051).
+- **EPIC-09:** STORY-9.1 (webhooks de saída — RF-061).
+
+**Dependências:** R1 (engine + outbox) e R2 (API pública / agente via plataforma).
+
+**Riscos:** template WhatsApp rejeitado / sem sessão ativa. Mitigação: fallback link `wa.me` (comportamento já existente); log do envio na consulta.
+
+**Segurança / Escalabilidade / ITIL:** webhooks de saída com assinaturas por conta; lembretes saem via outbox (mesma garantia de entrega). ITIL: log de envio por consulta vira base de auditoria de comunicação.
+
+> **CRITÉRIO DE AVANÇO (R4 → R5):**
+> 1. Consulta agendada para amanhã **gera lembrete**; log do envio visível na consulta.
+> 2. Paciente responde "cancelar" → consulta cancelada + card em CANCELOU, **sem ação humana**.
+> 3. n8n recebe evento de "consulta cancelada" **≤10s**.
+
+---
+
+### R5 — VISÃO FINANCEIRA (CLINICORP + DASHBOARD FINANCEIRO)
+
+**Objetivo:** integrar o financeiro Clinicorp (somente leitura) e entregar a visão de saúde financeira ao admin — a última fase de implementação, conforme confirmado na descoberta.
+
+**O que o cliente passa a conseguir fazer:** admin vê faturamento, entradas/saídas, fluxo de caixa, valores em aberto, inadimplentes (com botão "Cobrar via WhatsApp"), formas de pagamento e forecast de recebíveis; a ficha do paciente ganha resumo financeiro (total gasto, em aberto, última visita, orçamentos).
+
+**Stories incluídas (a detalhar no início da release):**
+- **EPIC-10:** STORY-10.1 (pull diário+sob demanda — RF-040/RI-005), STORY-10.2 (formas de pagamento/entradas — RF-041), STORY-10.3 (forecast estatístico — RF-042/IA-003).
+- **EPIC-11:** STORY-11.1 (dashboard financeiro admin-only — RF-044/RNF-012), STORY-11.2 (cobrança WhatsApp com confirmação+log — RF-043).
+- **EPIC-12:** STORY-12.1 (financeiro na ficha 360° — RF-014).
+
+**Dependências:** R1 (ficha 360° + matching de paciente por telefone). **Pré-requisito de release:** PoC Clinicorp — confirmar payloads de `/financial/list_invoices` e `/estimates/list` em conta real **antes** do task-producao quebrar as tasks (o Swagger não detalha os schemas de resposta).
+
+**Riscos:** Clinicorp fora do ar / credencial inválida. Mitigação: exibir último snapshot com timestamp; nenhuma outra área afetada (criticidade baixa para operação diária).
+
+**Segurança / Escalabilidade / ITIL:** financeiro **admin-only verificado no backend** (RNF-012); logs de acesso/cobrança em `audit_log` (RNF-011, LGPD — dados financeiros e de saúde); credenciais Clinicorp no mesmo cofre por conta. ITIL: job diário (madrugada) + atualização sob demanda; reconciliação como rotina de continuidade.
+
+> **CRITÉRIO DE AVANÇO (R5 → produto completo / melhoria contínua):**
+> 1. Valores financeiros **batem com o Clinicorp** na data da sincronização (com timestamp "atualizado em").
+> 2. Recepcionista/CRC **não acessa** rotas nem telas financeiras (bloqueio no backend, não só UI).
+> 3. Botão "Cobrar" envia/abre conversa com o **paciente correto**, com confirmação e log.
+
+---
+
+## 3. R0 — A FUNDAÇÃO MÍNIMA QUE DESTRAVA TUDO
+
+R0 foi desenhada como a **menor release possível** que já deixa os 3 devs produtivos, cobrindo exatamente os 4 pilares pedidos:
+
+| Pilar da fundação | O que entra | Tasks | Por que destrava |
+|---|---|---|---|
+| **Segurança / secrets** | Rotação do token Helena + cofre por conta (`account_integrations`, Vault/pgcrypto) | TASK-001, TASK-002 | Sem secrets por conta, nada multi-tenant funciona; risco ativo eliminado |
+| **Migrations do espelho** | Tabelas espelho/outbox/webhooks/log + alter `patients`/`appointments` + RLS | TASK-003, TASK-004, TASK-005 | EPIC-02 (sync) e EPIC-04 (kanban) não existem sem o espelho |
+| **Config Helena** | Cliente Helena (painel/card/tag) + tela de config + carga inicial do espelho | TASK-010, TASK-011, TASK-014 | Conecta a conta e popula os dados que o kanban vai ler |
+| **Vínculo de tags** | Tags cadastradas (humano) + tela de vínculo UUID↔significado | TASK-012, TASK-013 | Tags são as dimensões de filtro dos dashboards e as etiquetas dos cards |
+
+Concluída a R0, o time tem: ambiente seguro, dados de pé, conta conectada e espelho populado — pronto para construir o sync e as telas. Nenhuma frente do MVP fica bloqueada por fundação.
+
+---
+
+## 4. QUAL RELEASE É O MVP DEMONSTRÁVEL
+
+**O MVP é a R1.** É a primeira release que entrega valor **visível e end-to-end** ao cliente:
+
+> Agendar na grade visual → a ação move o card automaticamente → o cliente vê no **kanban próprio Contact** (sem abrir a Helena) → clica no paciente → abre a **ficha 360°**.
+
+R0 é fundação invisível (correto que não seja o MVP). R2 em diante são incrementos sobre um produto que já entrega valor. A R1 é o ponto de validação com usuários reais (a CRC operando um dia inteiro dentro da plataforma).
+
+---
+
+## 5. ESTRATÉGIA DE ALOCAÇÃO (André / Gabriel / Daniel)
+
+Alocação por **trilha e perfil**, sem quebrar em tasks (isso é do task-producao). Princípio transversal: **`revisor-entregas` obrigatório em toda entrega** e **código documentado** — especialmente reforçado para o Gabriel (mitiga o risco de aceitar sugestão de IA sem revisar).
+
+| Dev | Perfil | Trilha principal | Releases-foco | Salvaguarda |
+|---|---|---|---|---|
+| **Gabriel** (Júnior, mais horas de Claude Code, criou a Agenda, destemido) | Forte em volume e no domínio do código existente | **Núcleo de sync** (Card Sync Engine, Outbox, Webhooks — EPIC-02) e agenda (EPIC-03, que ele já conhece) | R1 (núcleo crítico) | **Revisão reforçada** + André como par técnico no sync; nenhuma entrega do núcleo passa sem `revisor-entregas` |
+| **Daniel** (Júnior, forte em front-end) | UI/UX e componentes | **Trilhas de front** (tokens de marca, kanban EPIC-04, telas de agenda visuais, paciente 360° EPIC-05, dashboards R3) | R1 (front) e R3 | Tasks visuais paralelizáveis com mocks; revisão de design nos gráficos (R3) |
+| **André** (Pleno, líder de processo/negócio, n8n, prompt, Claude Code hooks) | Integração, config, automação, orquestração | **Config/integração/automação** (config Helena, secrets, API pública EPIC-06, migração n8n, lembrete D-1 EPIC-08, webhooks de saída EPIC-09) e **revisão técnica** do núcleo | R0, R2, R4 | Atua como revisor técnico e par do Gabriel no sync; dono da migração n8n (ADR 7) |
+
+**Por release:**
+- **R0:** André lidera (segurança/secrets/config Helena); Gabriel nas migrations do espelho; Daniel começa tokens de marca (TASK-040) e bloqueios/filtros visuais (TASK-032/033) em paralelo.
+- **R1:** Gabriel no núcleo de sync (revisão reforçada + par André); Daniel no kanban e paciente 360°; André no vínculo Helena e como revisor técnico.
+- **R2:** André lidera (API pública + migração n8n); Gabriel apoia no `/api/v1` (reaproveita a engine); Daniel no Swagger UI.
+- **R3:** Daniel lidera o front dos dashboards; André/Gabriel no Metrics Service.
+- **R4:** André lidera (automação D-1 + webhooks de saída — domínio n8n dele).
+- **R5:** Gabriel/André na integração Clinicorp; Daniel no dashboard financeiro + ficha.
+
+---
+
+## 6. CICLO "RELEASE CONCLUÍDA → VOLTA AO ARQUITETO → LIBERA PRÓXIMA"
+
+O roadmap é vivo. Cada release fecha num gate de arquitetura:
+
+1. **task-producao quebra a release atual em tasks** (uma release por vez; as futuras ficam no roadmap aguardando). A primeira a quebrar é a **R0**.
+2. **Time executa**, com `revisor-entregas` validando cada entrega contra os critérios de aceite/DoD do BACKLOG.
+3. **Ao bater o CRITÉRIO DE AVANÇO da release**, o trabalho **volta ao arquiteto** (esta fase). O arquiteto:
+   - Verifica o critério de avanço objetivamente (não "quando der").
+   - **Revisa o roadmap à luz do aprendizado real** — prioridades mudam com feedback (ex.: se na R1 a CRC pedir um ajuste de UX que valha mais que a API pública, R2 e R3 podem ser reordenadas).
+   - **Só então libera a próxima release** para o task-producao quebrar em tasks.
+4. **Pontos de revisão obrigatórios do roadmap:**
+   - Após **R0**: confirmar que o espelho bate com a Helena antes de investir no sync.
+   - Após **R1 (MVP)**: validação com usuário real — o feedback aqui pode reordenar R2–R5.
+   - Após **R2**: confirmar que o single writer (ADR 7) está íntegro antes de empilhar automações (R4) sobre ele.
+   - Antes de **R5**: PoC Clinicorp é gate de entrada (sem payloads confirmados, não quebrar tasks).
+
+---
+
+## RESUMO EXECUTIVO
+
+- **Nº de releases:** 6 (R0 Fundação · R1 MVP · R2 API/n8n · R3 Dashboard Leads · R4 Automação/Lembrete · R5 Financeiro).
+- **MVP demonstrável:** **R1** — agendar → card move → kanban próprio → paciente 360°, sem abrir a Helena.
+- **Caminho do arquivo:** `c:\Users\andre.pujol\Desktop\CONTACT.PROJETOS\MELHORIA PLATAFORMA\docs\ROADMAP-PRODUTO.md`
+- **Release que o task-producao deve quebrar primeiro:** **R0 — Fundação segura + espelho Helena** (EPIC-00 + EPIC-01). As tasks já estão adiantadas no BACKLOG (TASK-001..014); começar por TASK-001 (rotação do token, segurança #1) e TASK-012 (cadastro de tags — pré-requisito humano, paralelo).

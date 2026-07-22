@@ -1,0 +1,286 @@
+# ARQUITETURA E COMPONENTES — Plataforma Contact (Escala Agenda 2.0)
+
+> **Versão:** 1.0 · **Data:** 12/06/2026 · **Par do documento:** `requisitos-do-sistema.md`
+> **Princípio central:** as APIs externas (Helena, Clinicorp) **nunca** são lidas diretamente pela UI. Tudo é espelhado no Supabase; a UI lê o espelho (rápido, com Realtime) e as escritas saem por uma fila de sincronização (outbox) com retry.
+
+---
+
+## 1. DIAGRAMA GERAL
+
+```mermaid
+graph TD
+    subgraph Cliente["Frontend — Next.js 16 + React 19 (identidade Contact)"]
+        AG[Agenda<br/>dia/semana/lista]
+        KB[Kanban Painéis<br/>front próprio]
+        P360[Paciente 360°]
+        DL[Dashboard<br/>Gestão de Leads]
+        DF[Dashboard<br/>Financeiro · admin]
+        CFG[Configurações]
+    end
+
+    subgraph Backend["Backend — Next.js API Routes"]
+        API[API REST interna<br/>JWT humano/IA]
+        PUB[API Pública v1<br/>API Key + escopos<br/>OpenAPI]
+        SYNC[Card Sync Engine<br/>status ⇄ etapa]
+        OUTBOX[Outbox Worker<br/>retry/backoff]
+        WHK[Webhook Receiver<br/>/api/webhooks/helena]
+        CRON[Jobs agendados<br/>lembrete D-1 · sync Clinicorp · reconciliação]
+        MET[Metrics Service<br/>agregações p/ dashboards]
+    end
+
+    subgraph Dados["Supabase (PostgreSQL 17 · RLS · Realtime)"]
+        DB[(Tabelas core<br/>appointments, patients...)]
+        MIRROR[(Espelho Helena<br/>panels, steps, cards)]
+        FIN[(Snapshots Clinicorp<br/>invoices, payments, estimates)]
+        QUEUE[(sync_outbox ·<br/>webhook_events · sync_log)]
+    end
+
+    subgraph Externos["Serviços Externos"]
+        HEL[Helena API<br/>api.wts.chat]
+        CLI[Clinicorp API<br/>api.clinicorp.com]
+        N8N[n8n + Agente IA<br/>WhatsApp]
+    end
+
+    AG --> API
+    KB --> API
+    P360 --> API
+    DL --> API
+    DF --> API
+    CFG --> API
+
+    API --> DB
+    API --> MIRROR
+    API --> SYNC
+    SYNC --> QUEUE
+    OUTBOX --> QUEUE
+    OUTBOX -->|PUT/POST cards, contatos, mensagens| HEL
+    HEL -->|webhooks: card movido, contato, sessão| WHK
+    WHK --> QUEUE
+    WHK --> MIRROR
+    WHK --> DB
+    CRON -->|pull diário + sob demanda| CLI
+    CRON --> FIN
+    CRON -->|lembretes via outbox| QUEUE
+    MET --> MIRROR
+    MET --> FIN
+    DB -.Realtime.-> AG
+    MIRROR -.Realtime.-> KB
+    N8N -->|API Key| PUB
+    PUB --> API
+    API -->|webhooks de saída| N8N
+```
+
+---
+
+## 2. FRONTEND
+
+### 2.1 Telas
+
+| Tela | Propósito | Elementos principais | Persona |
+|---|---|---|---|
+| **Agenda** (evolução da existente) | Operação diária de consultas | Visões dia/semana/lista; grid com **bloqueios renderizados** e horários fora de expediente sombreados; filtros **unidade + procedimento** + dentista + status; busca; **seletor visual de slots** no modal; aviso de conflito pré-confirmação; popover com **ações rápidas** (Confirmar, Compareceu, Faltou, Cancelar, Reagendar, Fechou c/ valor); badge de "sync pendente" | CRC, Gestor |
+| **Kanban de Painéis** (nova) | Funil visual com identidade Contact | 9 colunas (LEADS → ... → COMPARECEU E FECHOU); cards com nome, data, horário, etiquetas (unidade, CRC, IA); drag-and-drop entre colunas; modal do card (notas, valor, link p/ paciente e p/ conversa); filtros por etiqueta; contagem e soma de valores por coluna; atualização Realtime | CRC, Gestor |
+| **Paciente 360°** (nova — drawer/página) | Visão completa do paciente | Dados cadastrais; etapa atual no funil (com ação de mover); histórico de consultas (timeline); vínculo Helena (contact/lead id); notas; *(Fase 3)* resumo financeiro: total gasto, em aberto, última visita, orçamentos | CRC, Gestor |
+| **Dashboard Gestão de Leads** (nova) | Métricas do funil | Cards de KPI; funil de conversão; séries temporais; ranking CRC; comparativo IA × humano; distribuição por unidade; filtros dia/semana/mês + calendário custom + unidade + CRC + origem | Todos |
+| **Dashboard Financeiro** (nova, Fase 3) | Saúde financeira | Faturamento, entradas/saídas, fluxo de caixa, em aberto, inadimplentes (lista com **botão Cobrar via WhatsApp**), formas de pagamento, forecast de recebíveis; timestamp da última sync + botão "Atualizar agora" | Admin |
+| **Configurações** (evolução) | Administração | Abas existentes (unidades, cadeiras, procedimentos, profissionais, API keys) + novas: **Integração Helena** (token, seleção do painel, mapeamento etapa↔StepId, etiquetas), **Integração Clinicorp** (credenciais, teste de conexão), **Automações** (lembrete D-1: horário/template), **Webhooks de saída** | Admin |
+
+### 2.2 Controlador de Interações
+
+- **Estado:** hooks existentes (`useAppointments`, `useSlots`...) + novos `usePanelCards`, `useMetrics`, `useFinance`; cache de leitura com revalidação por Supabase Realtime (assinatura por conta).
+- **Padrão de mutação otimista:** mover card/mudar status atualiza a UI imediatamente, grava no banco e enfileira o sync externo; em falha definitiva, a UI exibe estado "pendente/erro" e permite reenviar.
+- **Navegação cruzada (o "conversando entre si"):** agenda → clique no paciente → Paciente 360° → card no funil → conversa WhatsApp; dashboard → clique em métrica → lista de cards filtrada (drill-down).
+
+### 2.3 Identidade Visual (tokens da marca Contact)
+
+O design system de todas as novas telas (kanban, dashboards, Paciente 360°) e da evolução da agenda aplica os tokens oficiais da marca — gradiente roxo→vermelho em botões primários, chips selecionados e cabeçalhos:
+
+| Token | Valor | Uso |
+|---|---|---|
+| `--brand` | `linear-gradient(135deg, #7C3AED 0%, #C026D3 50%, #DC2626 100%)` | Fundos de destaque (botões primários, chips ativos, headers) |
+| `--brand-solid` | `#9333EA` | Bordas e estados de foco/hover |
+| `--brand-light` | `#faf5ff` | Fundo suave em hover |
+| `--brand-text` | `#7C3AED` | Textos com cor da marca |
+| `--brand-border` | `rgba(147, 51, 234, 0.3)` | Anel de foco em inputs/selects |
+
+**Cores de apoio:** cinzas Tailwind (`#e2e8f0` bordas, `#94a3b8`/`#475569` textos secundários), verde `#16a34a` (sucesso/confirmado), vermelho `#dc2626` (erros e ações destrutivas).
+
+**Aplicação no projeto:** os tokens serão declarados como CSS custom properties no tema global (Tailwind 4 `@theme` em `globals.css`) e mapeados para utilities (`bg-brand`, `text-brand`, `ring-brand-border`), garantindo consistência entre agenda, kanban e dashboards. Cores semânticas do domínio (status de consulta e etapas do funil) derivam desta paleta — ex.: confirmado/fechou = verde, cancelado/faltou = vermelho, etapas ativas do funil = escala da marca.
+
+---
+
+## 3. BACKEND (módulos)
+
+| Módulo | Função | Processamento / Dados | Atende |
+|---|---|---|---|
+| **Agenda Service** (existente, evoluído) | CRUD consultas, slots, conflitos | Durações dinâmicas por procedimento; conflitos pré-validados; toda transição de status emite `domain event` interno | RF-001..007 |
+| **Card Sync Engine** (novo — núcleo) | Traduz eventos da agenda em movimentações de card e vice-versa | Tabela de mapeamento `status → etapa` configurável por conta; monta payload do card (nome, data, horário, etiquetas unidade/CRC/IA); grava intenção no `sync_outbox`; aplica eventos inbound no espelho + agenda; **anti-loop:** toda escrita carrega `origin` (platform/helena/n8n) e eventos cuja origem é a própria plataforma são ignorados no inbound | RF-006, 022, 023, 024 |
+| **Outbox Worker** (novo) | Entrega confiável para Helena | Processa `sync_outbox` (FIFO por card); retry exponencial ×5; estratégia primária `PUT /crm/v2/panel/card/{cardId}` (StepId — validado em produção), fallback duplicate/delete+create; marca `sync_log` | RNF-014, 015 |
+| **Webhook Receiver** (novo) | Entrada de eventos Helena | `POST /api/webhooks/helena`; valida segredo; deduplica por event id (`webhook_events`); roteia para Card Sync Engine / Contact Sync | RF-024, RNF-013 |
+| **Panel Mirror Service** (novo) | Espelho de painéis/cards | Sync inicial completo (paginado 100/pág.) + incremental por webhook + **reconciliação diária** (diff espelho × Helena) | RF-020, 021, RNF-032 |
+| **Patient Service** (evoluído) | Paciente 360° | Agrega: cadastro local + histórico de consultas + card atual (espelho) + vínculo Helena (resolução por telefone E.164, persiste contact_id/lead_id) + *(F3)* financeiro | RF-010..014 |
+| **Metrics Service** (novo) | Agregações para dashboards | Views materializadas / RPCs sobre espelho de cards (contagem por etapa × período × etiqueta) e snapshots financeiros; refresh por evento + agendado | RF-030..032, RNF-001 |
+| **Clinicorp Sync** (novo, Fase 3) | Pull financeiro | Job diário + sob demanda; Basic auth; pagina `financial/*`, `estimates/*`, `patient/*`; normaliza para snapshots locais; matching por telefone normalizado | RF-040..042, RI-005/006 |
+| **Automation Scheduler** (novo, Fase 2) | Lembretes e rotinas | Cron diário: consultas D+1 sem confirmação → template Helena via outbox; registra envio na consulta | RF-050 |
+| **API Pública v1** (novo) | Integrações externas | `/api/v1/*` (agenda, pacientes, painéis, métricas, financeiro-admin); API Key com escopos; rate limit; spec OpenAPI gerada e publicada; webhooks de saída (assinaturas por conta) | RF-060, 061 |
+| **Auth/RBAC** (evoluído) | Permissões | Papéis admin/CRC/dentista; middleware bloqueia financeiro p/ não-admin; escopos de API Key | RF-070, RNF-012 |
+
+---
+
+## 4. BANCO DE DADOS
+
+### 4.1 Novas entidades (além das 13 existentes)
+
+```mermaid
+erDiagram
+    accounts ||--o{ helena_panels : possui
+    helena_panels ||--o{ helena_steps : contem
+    helena_panels ||--o{ helena_cards : contem
+    helena_steps ||--o{ helena_cards : etapa_atual
+    patients ||--o{ helena_cards : vinculado
+    appointments ||--o| appointment_cards : gera
+    helena_cards ||--o| appointment_cards : reflete
+    accounts ||--o{ step_mappings : configura
+    accounts ||--o{ sync_outbox : enfileira
+    accounts ||--o{ webhook_events : recebe
+    accounts ||--o{ fin_invoices : snapshot
+    accounts ||--o{ fin_payments : snapshot
+    patients ||--o{ fin_invoices : devedor
+    patients ||--o{ clinicorp_links : matching
+
+    helena_panels { uuid id PK
+        uuid account_id FK
+        text helena_panel_id
+        text title
+        timestamptz synced_at }
+    helena_steps { uuid id PK
+        text helena_step_id
+        text name
+        int position }
+    helena_cards { uuid id PK
+        text helena_card_id
+        uuid step_id FK
+        uuid patient_id FK
+        text lead_name
+        date appt_date
+        time appt_time
+        text unit_tag
+        text crc_tag
+        text origin_tag
+        numeric closed_value
+        text status
+        timestamptz updated_at }
+    step_mappings { uuid id PK
+        text appointment_status
+        uuid target_step_id FK }
+    sync_outbox { uuid id PK
+        text operation
+        jsonb payload
+        text origin
+        int attempts
+        text status
+        timestamptz next_retry_at }
+    webhook_events { uuid id PK
+        text helena_event_id UK
+        text event_type
+        jsonb payload
+        text status }
+    fin_invoices { uuid id PK
+        uuid patient_id FK
+        numeric amount
+        date due_date
+        text payment_method
+        text status }
+    clinicorp_links { uuid id PK
+        uuid patient_id FK
+        text clinicorp_patient_id
+        text matched_by }
+```
+
+**Alterações em tabelas existentes:**
+- `patients`: + `helena_contact_id`, `helena_lead_id`, `phone_e164` (índice único por conta).
+- `appointments`: + `closed_value numeric`, `closed_at`, `confirmation_status` (lembrete D-1), `last_sync_status`.
+
+### 4.2 Dados sensíveis e proteção
+- Dados de saúde (consultas/procedimentos) e financeiros (faturas, valores): **RLS por `account_id`** em todas as novas tabelas (padrão já adotado).
+- Credenciais externas (token Helena, usuário/token Clinicorp): tabela `account_integrations` com secrets cifrados (Supabase Vault) — nunca expostos ao cliente.
+- Logs de acesso ao módulo financeiro (quem viu/cobrou) em `audit_log`.
+
+---
+
+## 5. SERVIÇOS EXTERNOS (APIs)
+
+| Serviço | Função no sistema | Recursos usados | Criticidade |
+|---|---|---|---|
+| **Helena — Painéis/Cards** | Backend do funil (estrutura dos painéis) | `GET /v2/panel`, `GET /v1/panel/{id}`, `GET /crm/v1/panel/card` (busca por contato), `PUT /crm/v2/panel/card/{cardId}` (move/atualiza — canônico, validado em produção), duplicate, notes | **Alta** para o funil; agenda continua operando sem ela (sync re-enfileirado) |
+| **Helena — Webhooks** | Sync inbound em tempo quase real | `/v1/webhook-event`, `/v1/webhook-subscription` | Média (reconciliação diária cobre perda) |
+| **Helena — Contatos** | Identidade do lead | `/v1/contact/phonenumber/{phone}`, CRUD contato, tags | Alta para vínculo paciente↔lead |
+| **Helena — Mensagens** | Lembretes, cobrança, sessões | `/v1/send/template`, `/v1/message/send`, `/v2/session/*` (já integrado) | Média (fallback wa.me) |
+| **Clinicorp** | Fonte financeira (somente leitura) | `/financial/*`, `/estimates/*`, `/patient/*`, `/payment/list` | Baixa para operação diária; alta para o dash financeiro (snapshot com timestamp) |
+| **n8n / Agente IA** | Automação WhatsApp (consumidor) | API pública v1 + `/api/agent/*` + webhooks de saída | Média (agenda manual independe) |
+
+---
+
+## 6. AGENTES DE IA
+
+| Agente | Função | Gatilho | Integração |
+|---|---|---|---|
+| **Agente de agendamento** (existente) | Agendar/cancelar/remarcar/consultar via WhatsApp | Mensagem do paciente (n8n) | Habilidades `/api/agent/*` → Agenda Service → Card Sync Engine (etiqueta `IA`) |
+| **Lembrete D-1** (Fase 2) | Confirmação de presença | Cron diário (Automation Scheduler) | Template Helena → resposta processada pelo agente → status + card |
+| **Forecast financeiro** (Fase 3) | Projeção de recebíveis | Pós-sync Clinicorp | Metrics Service (estatístico; sem LLM na v1) |
+
+---
+
+## 7. CONEXÕES E FLUXOS
+
+### Fluxos principais
+
+1. **CRC agenda consulta** · Agenda UI → `POST /api/appointments` → grava `appointments` → evento → Card Sync Engine resolve contato Helena (por telefone; cria se não existir) → outbox: card para **AGENDADOS** com etiquetas (unidade, CRC) → Outbox Worker → Helena → `sync_log` ok → Realtime atualiza kanban.
+2. **IA agenda via WhatsApp** · Chatbot Helena → webhook n8n (parsing da `annotation` estruturada: Status Atual, Estágio Parado, Dor Principal, Resumo Rápido, Instrução para o Futuro) → n8n chama `POST /api/agent/agendar` (e/ou `POST /api/v1/panel-cards/move`) → Card Sync Engine move o card com etiqueta **AGENDADO IA**, descrição formatada (📅 consulta, 👤 lead, 📋 resumo, 🎯 status/estágio, 🦷 dor, 🔜 instrução) e merge de tags — substituindo a chamada direta do n8n à Helena (ADR 7).
+3. **CRC clica "Cancelar"** · Popover → `PATCH /api/appointments/{id}/status` → status `cancelled` → card movido para **CANCELADOS** automaticamente (D4: correlação total).
+4. **Reagendamento** · Modal/drag → `PATCH /api/appointments/{id}` → card → **REAGENDADOS** + atualização de data/horário no card.
+5. **"Compareceu" e fechamento** · Ação rápida → `completed` → card → **COMPARECEU NÃO FECHOU**; se CRC registra valor ("Fechou") → card → **COMPARECEU E FECHOU** com `closed_value` → métricas de ticket médio atualizadas.
+6. **Card movido na Helena/n8n** · Webhook → Receiver valida + deduplica → Card Sync Engine: origem ≠ platform → atualiza espelho → se etapa implica status (ex.: CANCELADOS), atualiza `appointments` → Realtime atualiza agenda e kanban.
+7. **Dashboard de leads** · UI → Metrics Service → agregações no espelho local (etapa × período × etiqueta) → KPIs + gráficos; drill-down abre cards filtrados.
+8. **Sync financeiro (Fase 3)** · Cron 03:00 → Clinicorp Sync pagina endpoints → snapshots (`fin_*`) → matching por telefone → Dashboard Financeiro + ficha do paciente; botão "Atualizar agora" (admin) dispara o mesmo job.
+9. **Cobrança WhatsApp (Fase 3)** · Lista de inadimplentes → "Cobrar" → confirmação → mensagem via Helena (sessão ativa ou template) → log em `audit_log`.
+10. **Lembrete D-1 (Fase 2)** · Cron → consultas de amanhã não confirmadas → template via outbox → resposta do paciente → agente IA → status `confirmed`/`cancelled` → card correspondente.
+
+### Fluxos de erro
+
+- **Helena indisponível na escrita:** outbox mantém o item, retry exponencial ×5; consulta/card exibem badge "sync pendente"; após esgotar, alerta na UI + reenvio manual; agenda **nunca** bloqueia por falha de sync.
+- **`PUT /crm/v2/panel/card/{cardId}` não mover etapa em algum painel (risco residual R1):** fallback automático para estratégia n8n (duplicate/create na etapa destino + delete do antigo), preservando `helena_card_id` novo no espelho.
+- **Webhook perdido/duplicado:** dedup por `helena_event_id`; job de reconciliação diário compara espelho × `GET /crm/v1/panel/card` (UpdatedAt.After) e corrige divergências.
+- **Loop de sincronização (plataforma move card → webhook volta → moveria de novo):** campo `origin` na outbox + janela de supressão por card (ignora eventos inbound cujo estado já confere com o espelho).
+- **Contato Helena não encontrado / telefone duplicado:** criação automática no primeiro caso; no segundo, card fica "pendente de vínculo" e a UI pede resolução manual (lista de candidatos).
+- **Clinicorp fora do ar / credencial inválida:** dashboard exibe último snapshot com aviso "dados de DD/MM HH:mm"; teste de conexão disponível nas configurações; nenhuma outra área é afetada.
+- **Dado inválido no agendamento (conflito, slot ocupado em corrida):** validação atômica no banco (`check_appointment_conflict`) responde 409 com sugestão de slots alternativos; UI reabre o seletor.
+- **Template WhatsApp rejeitado / sem sessão ativa:** registra falha no log da consulta e oferece fallback de link `wa.me` (comportamento já existente).
+- **API pública — key sem escopo / rate limit:** 403/429 padronizados com corpo `{ code, message }` documentado no OpenAPI.
+
+---
+
+## 8. DECISÕES DE ARQUITETURA (ADRs resumidas)
+
+| # | Decisão | Justificativa |
+|---|---|---|
+| 1 | **Espelho local (mirror) + outbox** em vez de chamadas diretas às APIs externas | Dashboards p95 < 2s, resiliência a indisponibilidade, rate limits, Realtime na UI |
+| 2 | **Agenda própria como fonte da verdade**; Clinicorp somente leitura financeira | D1 — estratégia de trazer clientes do Clinicorp para a plataforma |
+| 3 | **Helena como backend do funil**, frontend kanban próprio | D3/descoberta — aproveitamento da estrutura (painéis, webhooks, WhatsApp) com UX própria |
+| 4 | **Identidade do lead = Helena** (contact_id/lead_id), matching Clinicorp por telefone | D2 |
+| 5 | Mapeamento `status → etapa` **configurável por conta** | Painéis variam por clínica (multi-tenant) |
+| 6 | Forecast financeiro **estatístico** na v1 (sem LLM) | Previsibilidade e simplicidade; evolução futura aberta (visão fintech/Asaas) |
+| 7 | **Single writer de cards:** toda movimentação de card (agenda, ficha, kanban, chatbot) passa pela Card Sync Engine do backend. O n8n deixa de chamar a Helena diretamente e passa a chamar a **API pública da plataforma**; só a plataforma escreve na Helena | Log/retry/auditoria centralizados, espelho sempre consistente, anti-loop trivial, dashboards corretos. Validado: `PUT /crm/v2/panel/card/{id}` com `fields:[StepId,Description,TagIds]` move o card (workflow Salutar em produção) |
+| 8 | **Etiquetas pré-criadas na Helena** (API não cria tags); plataforma lista (`GET /v1/tag`) e o admin vincula UUID↔significado (unidade/CRC/canal) na configuração | Restrição da Helena confirmada na descoberta; escrita sempre em merge de tagIds |
+
+---
+
+## 9. PRÓXIMOS PASSOS TÉCNICOS
+
+1. ~~PoC Helena: validar movimentação de card~~ — **RESOLVIDO** (12/06/2026): `PUT https://api.wts.chat/crm/v2/panel/card/{cardId}` com `fields:[StepId,Description,TagIds]` move o card (validado pelo workflow n8n da Salutar em produção). Resta inventariar eventos reais em `GET /v1/webhook-event` para o sync inbound.
+2. **Cadastro e vínculo de etiquetas:** criar manualmente na Helena as tags faltantes (uma por CRC + unidades), listar via `GET /v1/tag` e vincular UUIDs na tela de configuração (ADR 8).
+3. **Segurança imediata:** rotacionar o token Helena exposto no workflow n8n; mover tokens para secret store (Supabase Vault) por conta.
+4. **PoC Clinicorp (antes da Fase 3):** chamada autenticada a `/financial/list_invoices` e `/estimates/list` em conta real para confirmar payloads (o Swagger não detalha os schemas de resposta).
+5. Migrations das novas tabelas (espelho, outbox, mappings) + RLS.
+6. Design system do kanban e dashboards aplicando os **tokens da identidade Contact** (§2.3) antes do desenvolvimento das telas.
+7. Geração da documentação OpenAPI da API pública v1 + migração dos workflows n8n para consumir a API da plataforma (ADR 7).

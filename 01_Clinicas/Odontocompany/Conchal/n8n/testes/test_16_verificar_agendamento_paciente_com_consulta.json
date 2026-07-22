@@ -1,0 +1,5 @@
+{
+  "action": "verificar_agendamento_paciente",
+  "telefone_cliente": "19987654321",
+  "nome_cliente": "Maria Oliveira"
+}

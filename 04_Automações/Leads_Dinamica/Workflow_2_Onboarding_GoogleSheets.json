@@ -1,0 +1,164 @@
+{
+  "name": "Leads - Onboarding (Auto-config clinica) [Google Sheets]",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-2000, 400],
+      "id": "wf2s-trigger",
+      "name": "Inicio (Manual)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "in-1", "name": "companyId", "value": "COLE_O_COMPANYID_AQUI", "type": "string" },
+            { "id": "in-2", "name": "helena_token", "value": "COLE_O_TOKEN_DA_CLINICA_AQUI", "type": "string" },
+            { "id": "in-3", "name": "nome", "value": "", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-1780, 400],
+      "id": "wf2s-entradas",
+      "name": "Entradas"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.wts.chat/crm/v1/panel?IncludeDetails=Steps&PageSize=100",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $('Entradas').first().json.helena_token }}" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-1560, 400],
+      "id": "wf2s-listar-paineis",
+      "name": "Listar Paineis"
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nconst items = Array.isArray(resp) ? resp : (resp.items ?? resp.data ?? []);\nconst paineis = items.filter(p => !p.archived);\nif (paineis.length === 0) throw new Error('Nenhum painel encontrado para a conta.');\n\nconst avisos = [];\nif (paineis.length > 1) avisos.push(`Conta tem ${paineis.length} paineis; usando o primeiro: \"${paineis[0].title}\". Confira se e o correto.`);\n\nconst painel = paineis[0];\nconst steps = (painel.steps || []).filter(s => !s.archived);\nlet etapa = steps.find(s => s.isInitial) || steps.slice().sort((a,b)=> (a.position||0)-(b.position||0))[0];\nif (!etapa) throw new Error('Painel sem etapas validas.');\nif (!steps.find(s => s.isInitial)) avisos.push('Nenhuma etapa marcada como inicial; usei a de menor posicao.');\n\nreturn [{ json: { panel_id: painel.id, panel_title: painel.title, step_id: etapa.id, step_title: etapa.title, avisos } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-1340, 400],
+      "id": "wf2s-escolher",
+      "name": "Escolher Painel e Etapa"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.wts.chat/crm/v1/panel/{{ $json.panel_id }}?IncludeDetails=Tags",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $('Entradas').first().json.helena_token }}" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-1120, 400],
+      "id": "wf2s-tags-card",
+      "name": "Tags Card Painel"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.wts.chat/core/v1/tag?PageSize=200",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $('Entradas').first().json.helena_token }}" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-900, 400],
+      "id": "wf2s-tags-contato",
+      "name": "Tags Contato"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Match por palavra-chave e monta a LINHA PLANA p/ a planilha.\n// Ambiguidade (0 ou >1 candidatas) => registra em status_obs p/ revisao manual.\nconst entradas = $('Entradas').first().json;\nconst escolha = $('Escolher Painel e Etapa').first().json;\n\nconst painelResp = $('Tags Card Painel').first().json;\nconst cardTags = painelResp.tags || [];\n\nconst contatoResp = $('Tags Contato').first().json;\nconst contatoTags = Array.isArray(contatoResp) ? contatoResp : (contatoResp.items ?? []);\n\nconst norm = (s) => (s || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().trim();\nconst achar = (tags, kw) => tags.filter(t => norm(t.name).includes(kw));\n\nconst REGRAS = [\n  { p: 'fb',  kw: 'facebook' },\n  { p: 'ig',  kw: 'instagram' },\n  { p: 'org', kw: 'organico' }\n];\nconst ROTULO = { fb: 'Facebook', ig: 'Instagram', org: 'Organico' };\n\nconst row = {\n  helena_company_id: entradas.companyId,\n  nome: (entradas.nome && entradas.nome.trim()) ? entradas.nome.trim() : escolha.panel_title,\n  helena_token: entradas.helena_token,\n  panel_id: escolha.panel_id,\n  step_id: escolha.step_id,\n  ativo: 'true'\n};\n\nconst avisos = [...(escolha.avisos || [])];\nfor (const r of REGRAS) {\n  const card = achar(cardTags, r.kw);\n  const contato = achar(contatoTags, r.kw);\n  if (card.length !== 1) avisos.push(`Tag de CARD ${ROTULO[r.p]}: ${card.length} candidata(s) -> ${card.map(t=>t.name).join(' | ') || 'nenhuma'}`);\n  if (contato.length !== 1) avisos.push(`Tag de CONTATO ${ROTULO[r.p]}: ${contato.length} candidata(s) -> ${contato.map(t=>t.name).join(' | ') || 'nenhuma'}`);\n  row[`${r.p}_tag_nome`] = ROTULO[r.p];\n  row[`${r.p}_panel_tag_id`] = card[0]?.id ?? '';\n  row[`${r.p}_contact_tag_id`] = contato[0]?.id ?? '';\n}\nrow.status_obs = avisos.length ? avisos.join(' | ') : 'ok';\n\nreturn [{ json: { row, avisos, resumo: { painel: escolha.panel_title, etapa: escolha.step_title } } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-680, 400],
+      "id": "wf2s-montar",
+      "name": "Montar Linha"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": { "__rl": true, "value": "COLE_O_ID_DA_PLANILHA_AQUI", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "clinicas", "mode": "name" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "helena_company_id": "={{ $json.row.helena_company_id }}",
+            "nome": "={{ $json.row.nome }}",
+            "helena_token": "={{ $json.row.helena_token }}",
+            "panel_id": "={{ $json.row.panel_id }}",
+            "step_id": "={{ $json.row.step_id }}",
+            "ativo": "={{ $json.row.ativo }}",
+            "fb_tag_nome": "={{ $json.row.fb_tag_nome }}",
+            "fb_panel_tag_id": "={{ $json.row.fb_panel_tag_id }}",
+            "fb_contact_tag_id": "={{ $json.row.fb_contact_tag_id }}",
+            "ig_tag_nome": "={{ $json.row.ig_tag_nome }}",
+            "ig_panel_tag_id": "={{ $json.row.ig_panel_tag_id }}",
+            "ig_contact_tag_id": "={{ $json.row.ig_contact_tag_id }}",
+            "org_tag_nome": "={{ $json.row.org_tag_nome }}",
+            "org_panel_tag_id": "={{ $json.row.org_panel_tag_id }}",
+            "org_contact_tag_id": "={{ $json.row.org_contact_tag_id }}",
+            "status_obs": "={{ $json.row.status_obs }}"
+          },
+          "matchingColumns": ["helena_company_id"]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [-460, 400],
+      "id": "wf2s-upsert",
+      "name": "Gravar na Planilha",
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_CRED_ID", "name": "Google Sheets account" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Montar Linha').first().json;\nconst pendente = (m.avisos && m.avisos.length) ? m.avisos : [];\nreturn [{ json: {\n  resumo: m.resumo,\n  linha_gravada: m.row,\n  avisos: pendente,\n  acao_necessaria: pendente.length ? 'Revisar/corrigir os IDs marcados em status_obs na planilha.' : 'Nenhuma. Config completa.'\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-240, 400],
+      "id": "wf2s-resultado",
+      "name": "Resultado"
+    }
+  ],
+  "connections": {
+    "Inicio (Manual)": { "main": [[{ "node": "Entradas", "type": "main", "index": 0 }]] },
+    "Entradas": { "main": [[{ "node": "Listar Paineis", "type": "main", "index": 0 }]] },
+    "Listar Paineis": { "main": [[{ "node": "Escolher Painel e Etapa", "type": "main", "index": 0 }]] },
+    "Escolher Painel e Etapa": { "main": [[{ "node": "Tags Card Painel", "type": "main", "index": 0 }]] },
+    "Tags Card Painel": { "main": [[{ "node": "Tags Contato", "type": "main", "index": 0 }]] },
+    "Tags Contato": { "main": [[{ "node": "Montar Linha", "type": "main", "index": 0 }]] },
+    "Montar Linha": { "main": [[{ "node": "Gravar na Planilha", "type": "main", "index": 0 }]] },
+    "Gravar na Planilha": { "main": [[{ "node": "Resultado", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

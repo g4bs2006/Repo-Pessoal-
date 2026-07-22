@@ -1,0 +1,21 @@
+{
+  "errorMessage": "contactId não encontrado no payload [line 8]",
+  "errorDetails": {},
+  "n8nDetails": {
+    "n8nVersion": "1.121.3 (Self Hosted)",
+    "binaryDataMode": "default",
+    "stackTrace": [
+      "Error: contactId não encontrado no payload",
+      "    at VmCodeWrapper (evalmachine.<anonymous>:8:23)",
+      "    at evalmachine.<anonymous>:53:2",
+      "    at Script.runInContext (node:vm:149:12)",
+      "    at runInContext (node:vm:301:6)",
+      "    at result (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/@n8n+task-runner@file+packages+@n8n+task-runner_@opentelemetry+api@1.9.0_@opentelemetry_5147392a3f2dab4b87aa45b14b25796a/node_modules/@n8n/task-runner/dist/js-task-runner/js-task-runner.js:176:61)",
+      "    at new Promise (<anonymous>)",
+      "    at JsTaskRunner.runForAllItems (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/@n8n+task-runner@file+packages+@n8n+task-runner_@opentelemetry+api@1.9.0_@opentelemetry_5147392a3f2dab4b87aa45b14b25796a/node_modules/@n8n/task-runner/dist/js-task-runner/js-task-runner.js:169:34)",
+      "    at JsTaskRunner.executeTask (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/@n8n+task-runner@file+packages+@n8n+task-runner_@opentelemetry+api@1.9.0_@opentelemetry_5147392a3f2dab4b87aa45b14b25796a/node_modules/@n8n/task-runner/dist/js-task-runner/js-task-runner.js:119:26)",
+      "    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)",
+      "    at async Object.waitingForSettings (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/@n8n+task-runner@file+packages+@n8n+task-runner_@opentelemetry+api@1.9.0_@opentelemetry_5147392a3f2dab4b87aa45b14b25796a/node_modules/@n8n/task-runner/dist/task-runner.js:256:17)"
+    ]
+  }
+}

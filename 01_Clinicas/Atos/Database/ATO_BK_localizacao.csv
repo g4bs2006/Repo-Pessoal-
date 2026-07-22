@@ -1,0 +1,12 @@
+id,categoria,campo,valor
+1,endereco,logradouro,R. Leonor Pinheiro da Silva
+2,endereco,numero,29
+3,endereco,bairro,Parque do Colégio
+4,endereco,cidade,Jundiaí
+5,endereco,estado,SP
+6,endereco,endereco_completo,"R. Leonor Pinheiro da Silva, 29 - Parque do Colégio, Jundiaí/SP"
+7,maps,link_google_maps,https://maps.app.goo.gl/Pt8hWiy6JaNnGsih6
+8,mensagem,localizacao_padrao,"Estamos na R. Leonor Pinheiro da Silva, 29 - Parque do Colégio, Jundiaí/SP 📍"
+9,mensagem,link_padrao,"Segue o link do mapa para facilitar: https://maps.app.goo.gl/Pt8hWiy6JaNnGsih6"
+10,horario,funcionamento_padrao,"Segunda a sexta, manhã e tarde — horários confirmados via verificar_disponibilidade"
+11,acesso,referencia,"Bairro Parque do Colégio, Jundiaí"

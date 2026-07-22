@@ -1,0 +1,298 @@
+{
+  "name": "Leads - Mover/Espelhar para Agendados (PANEL_CARD_NEW) [Supabase nativo]",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mover-agendado",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-2600, 400],
+      "id": "wf3-webhook",
+      "name": "Card Criado (Back)",
+      "webhookId": "mover-agendado"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Payload real do PANEL_CARD_NEW: tudo em body.content.\nconst b = $input.first().json.body ?? $input.first().json;\nconst c = b.content ?? {};\nconst companyId = c.companyId ?? b.companyId ?? null;\nconst cardId = c.id ?? null;\nconst panelId_evt = c.panelId ?? null;\nconst title = c.title ?? null;\nconst description = c.description ?? null;\nconst contacts = Array.isArray(c.contacts) ? c.contacts : [];\nconst contactId = contacts.length ? contacts[0].id : null;\nreturn [{ json: { companyId, cardId, panelId_evt, title, description, contactId } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-2400, 400],
+      "id": "wf3-extrair",
+      "name": "Extrair Evento"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "automacao_clinicas",
+        "returnAll": false,
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            { "keyName": "helena_company_id", "condition": "eq", "keyValue": "={{ $json.companyId }}" }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [-2200, 400],
+      "id": "wf3-config",
+      "name": "Buscar Config",
+      "alwaysOutputData": true,
+      "credentials": { "supabaseApi": { "id": "wZl08LAiFVQcgDK3", "name": "Dashboards Odontologicos" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ev = $('Extrair Evento').first().json;\nconst row = $input.first().json || {};\nconst ativoBool = (row.ativo === true || String(row.ativo).toLowerCase() === 'true');\nconst okCfg = !!row.helena_company_id && ativoBool && !!row.back_panel_id && !!row.agendado_step_id;\nconst isBack = okCfg && ev.panelId_evt === row.back_panel_id;\nconst proceed = okCfg && isBack && !!ev.contactId && !!ev.cardId;\nreturn [{ json: {\n  ...ev,\n  found: proceed,\n  token: row.helena_token,\n  full_panel_id: row.panel_id,\n  agendado_step_id: row.agendado_step_id,\n  back_panel_id: row.back_panel_id\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-2000, 400],
+      "id": "wf3-validar",
+      "name": "Validar Config"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            { "id": "c-found", "leftValue": "={{ $json.found }}", "rightValue": "", "operator": { "type": "boolean", "operation": "true", "singleValue": true } }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-1800, 400],
+      "id": "wf3-if-config",
+      "name": "Prosseguir?"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.wts.chat/crm/v1/panel/card/{{ $('Validar Config').first().json.cardId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $('Validar Config').first().json.token }}" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-1580, 320],
+      "id": "wf3-get-back",
+      "name": "Get Card Back",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.wts.chat/crm/v1/panel/{{ $('Validar Config').first().json.back_panel_id }}?IncludeDetails=Tags",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $('Validar Config').first().json.token }}" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-1360, 320],
+      "id": "wf3-tags-back",
+      "name": "Tags Painel Back",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.wts.chat/crm/v1/panel/{{ $('Validar Config').first().json.full_panel_id }}?IncludeDetails=Tags",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $('Validar Config').first().json.token }}" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-1140, 320],
+      "id": "wf3-tags-full",
+      "name": "Tags Painel Full",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.wts.chat/crm/v1/panel/card?PanelId={{ $('Validar Config').first().json.full_panel_id }}&ContactId={{ $('Validar Config').first().json.contactId }}&IncludeArchived=false&OrderBy=CreatedAt&OrderDirection=DESCENDING&PageSize=5",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $('Validar Config').first().json.token }}" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-920, 320],
+      "id": "wf3-cards-full",
+      "name": "Cards no FULL",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const v = $('Validar Config').first().json;\nconst norm = (s) => (s || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().trim();\n\n// --- Card BACK (tags reais + descricao/titulo) ---\nconst backCard = $('Get Card Back').first().json || {};\nlet backTagIds = Array.isArray(backCard.tagIds) ? backCard.tagIds\n  : (Array.isArray(backCard.tags) ? backCard.tags.map(t => (t && (t.id || t))).filter(Boolean) : []);\nconst title = backCard.title ?? v.title ?? 'Lead';\nconst backDesc = backCard.description ?? v.description ?? '';\n\n// --- Mapas de tags por nome (tags sao por painel) ---\nconst backPanelTags = (($('Tags Painel Back').first().json) || {}).tags || [];\nconst backIdToName = {}; backPanelTags.forEach(t => { backIdToName[t.id] = t.name; });\nconst fullPanelTags = (($('Tags Painel Full').first().json) || {}).tags || [];\nconst fullNameToId = {}; fullPanelTags.forEach(t => { fullNameToId[norm(t.name)] = t.id; });\n\n// --- Espelha tags do back -> ids do FULL (por nome) ---\nconst mirroredTagIds = [];\nfor (const tid of backTagIds) {\n  const nm = norm(backIdToName[tid] || '');\n  const fullId = nm ? fullNameToId[nm] : null;\n  if (fullId && !mirroredTagIds.includes(fullId)) mirroredTagIds.push(fullId);\n}\n\n// --- Card existente no FULL ---\nconst resp = $('Cards no FULL').first().json;\nconst arr = Array.isArray(resp) ? resp : (resp.items ?? resp.data ?? resp.cards ?? []);\nconst card = (Array.isArray(arr) && arr.length) ? arr[0] : null;\nconst hasCard = !!card;\nconst fullCardId = hasCard ? (card.id ?? null) : null;\nconst currentStepId = hasCard ? (card.stepId ?? null) : null;\nconst existingTagIds = hasCard && Array.isArray(card.tagIds) ? card.tagIds : [];\nconst existingDesc = hasCard ? (card.description || '') : '';\nconst alreadyAgendado = hasCard && currentStepId === v.agendado_step_id;\n\n// --- Merge (mover sem perder) ---\nconst mergedTagIds = Array.from(new Set([...existingTagIds, ...mirroredTagIds]));\nlet mergedDesc = backDesc || '';\nif (existingDesc && backDesc && !existingDesc.includes(backDesc)) mergedDesc = existingDesc + '\\n\\n— Agendamento (IA) —\\n' + backDesc;\nelse if (existingDesc && !backDesc) mergedDesc = existingDesc;\n\nreturn [{ json: { hasCard, fullCardId, currentStepId, alreadyAgendado, contactId: v.contactId, title, mirroredTagIds, mergedTagIds, backDesc, mergedDesc } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-700, 320],
+      "id": "wf3-preparar",
+      "name": "Preparar Espelho"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            { "id": "c-hascard", "leftValue": "={{ $json.hasCard }}", "rightValue": "", "operator": { "type": "boolean", "operation": "true", "singleValue": true } }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-480, 320],
+      "id": "wf3-if-hascard",
+      "name": "Tem card no FULL?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            { "id": "c-already", "leftValue": "={{ $json.alreadyAgendado }}", "rightValue": "", "operator": { "type": "boolean", "operation": "true", "singleValue": true } }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-260, 220],
+      "id": "wf3-if-already",
+      "name": "Ja em Agendados?"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.wts.chat/crm/v2/panel/card/{{ $('Preparar Espelho').first().json.fullCardId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $('Validar Config').first().json.token }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"fields\": [\"stepId\", \"tagIds\", \"description\"],\n  \"stepId\": \"{{ $('Validar Config').first().json.agendado_step_id }}\",\n  \"tagIds\": {{ JSON.stringify($('Preparar Espelho').first().json.mergedTagIds) }},\n  \"description\": {{ JSON.stringify($('Preparar Espelho').first().json.mergedDesc) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-40, 120],
+      "id": "wf3-mover",
+      "name": "Mover + Mesclar",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.wts.chat/crm/v1/panel/card",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $('Validar Config').first().json.token }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"panelId\": \"{{ $('Validar Config').first().json.full_panel_id }}\",\n  \"stepId\": \"{{ $('Validar Config').first().json.agendado_step_id }}\",\n  \"title\": {{ JSON.stringify($('Preparar Espelho').first().json.title) }},\n  \"description\": {{ JSON.stringify($('Preparar Espelho').first().json.backDesc) }},\n  \"contactIds\": [\"{{ $('Preparar Espelho').first().json.contactId }}\"],\n  \"tagIds\": {{ JSON.stringify($('Preparar Espelho').first().json.mirroredTagIds) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-40, 500],
+      "id": "wf3-criar-full",
+      "name": "Criar Card no FULL"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"{{ $('Preparar Espelho').first().json.hasCard ? ($('Preparar Espelho').first().json.alreadyAgendado ? 'ja_em_agendados' : 'movido_mesclado') : 'criado_em_agendados' }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [200, 320],
+      "id": "wf3-respond-ok",
+      "name": "Responder OK"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"ignorado\",\n  \"motivo\": \"config inativa, card nao e do painel BACK, ou card sem contato\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [-1800, 640],
+      "id": "wf3-respond-skip",
+      "name": "Responder Ignorado"
+    }
+  ],
+  "connections": {
+    "Card Criado (Back)": { "main": [[{ "node": "Extrair Evento", "type": "main", "index": 0 }]] },
+    "Extrair Evento": { "main": [[{ "node": "Buscar Config", "type": "main", "index": 0 }]] },
+    "Buscar Config": { "main": [[{ "node": "Validar Config", "type": "main", "index": 0 }]] },
+    "Validar Config": { "main": [[{ "node": "Prosseguir?", "type": "main", "index": 0 }]] },
+    "Prosseguir?": {
+      "main": [
+        [{ "node": "Get Card Back", "type": "main", "index": 0 }],
+        [{ "node": "Responder Ignorado", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Card Back": { "main": [[{ "node": "Tags Painel Back", "type": "main", "index": 0 }]] },
+    "Tags Painel Back": { "main": [[{ "node": "Tags Painel Full", "type": "main", "index": 0 }]] },
+    "Tags Painel Full": { "main": [[{ "node": "Cards no FULL", "type": "main", "index": 0 }]] },
+    "Cards no FULL": { "main": [[{ "node": "Preparar Espelho", "type": "main", "index": 0 }]] },
+    "Preparar Espelho": { "main": [[{ "node": "Tem card no FULL?", "type": "main", "index": 0 }]] },
+    "Tem card no FULL?": {
+      "main": [
+        [{ "node": "Ja em Agendados?", "type": "main", "index": 0 }],
+        [{ "node": "Criar Card no FULL", "type": "main", "index": 0 }]
+      ]
+    },
+    "Ja em Agendados?": {
+      "main": [
+        [{ "node": "Responder OK", "type": "main", "index": 0 }],
+        [{ "node": "Mover + Mesclar", "type": "main", "index": 0 }]
+      ]
+    },
+    "Mover + Mesclar": { "main": [[{ "node": "Responder OK", "type": "main", "index": 0 }]] },
+    "Criar Card no FULL": { "main": [[{ "node": "Responder OK", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

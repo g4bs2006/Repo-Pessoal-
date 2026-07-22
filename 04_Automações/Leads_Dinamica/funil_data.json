@@ -1,0 +1,26 @@
+{
+  "total_contatos": 766,
+  "tags": {
+    "Agendou": 0,
+    "Compromisso de Honra": 90,
+    "Cancelou": 0,
+    "Urgência alta": 12,
+    "Urgência baixa": 59,
+    "Dor mastigação": 58,
+    "Dor estética": 24,
+    "Plano": 99,
+    "Particular": 45,
+    "Frio #1": 0,
+    "Frio #2": 613,
+    "Frio #3": 583,
+    "Inadimplente": 1
+  },
+  "painel": {
+    "Agendou": 61,
+    "Reagendou": 0,
+    "Cancelou": 0,
+    "Compareceu e NÃO Fechou": 0,
+    "Compareceu e Fechou": 1,
+    "Faltou": 0
+  }
+}

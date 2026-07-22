@@ -1,0 +1,13 @@
+Categoria,Chave,Valor
+"Endereço","Cidade","Araripina — Pernambuco (PE)"
+"Endereço","Região","Coração do Araripe"
+"Link de Localização","URL","https://maps.google.com/?q=-7.576123,-40.500877"
+"Contato","WhatsApp","(87) 99128-0530"
+"Horário de Funcionamento","Segunda a Sexta-feira","08h00 às 17h30"
+"Horário de Funcionamento","Sábado","Fechado"
+"Horário de Funcionamento","Domingo","Fechado"
+"Regra de Uso","Regra 1","Sempre que o paciente perguntar onde a clínica fica, envie o link de localização acompanhado de uma frase curta de orientação."
+"Regra de Uso","Regra 2","Nunca envie o link sem contexto. Sempre acompanhe de uma mensagem explicativa."
+"Regra de Uso","Regra 3","Se o paciente perguntar de qual cidade a clínica é, responda: ""Estamos em Araripina, Pernambuco."""
+"Regra de Uso","Regra 4","Não invente bairro, rua ou ponto de referência adicional. Use apenas as informações listadas acima."
+"Regra de Uso","Regra 5","Para dúvidas de horário fora do expediente, oriente que o atendimento humano retorna no próximo dia útil."

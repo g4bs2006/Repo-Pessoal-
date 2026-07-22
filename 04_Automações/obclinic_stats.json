@@ -1,0 +1,77 @@
+{
+  "clinica": "OBClinic Odontologia",
+  "agente": "Gi",
+  "cidade": "Joinville/SC",
+  "canal": "(47) 99700-8423",
+  "total": 526,
+  "agendou": 123,
+  "nao_agendou": 403,
+  "vacuo": 89,
+  "respondeu": 437,
+  "humano": 87,
+  "tx_conv": 23.4,
+  "tx_vacuo": 16.9,
+  "funil": {
+    "E0 - IA Respondeu": 2,
+    "E0 - Sem Resposta da IA": 43,
+    "E1 - Coletou Nome": 228,
+    "E2 - Mapeou Interesse": 35,
+    "E3 - Apresentou Valor/Clínica": 38,
+    "E4 - Tentou Agendar": 57,
+    "E5 - Agendou": 123
+  },
+  "motivos": {
+    "Lead sumiu após dar o nome — IA não avançou no mapeamento": 136,
+    "Lead não respondeu após primeiro contato da IA": 118,
+    "IA tentou agendar mas lead não confirmou horário": 49,
+    "Lead não aceitou agendar após ver o valor/clínica": 35,
+    "Lead sumiu antes de receber proposta de agendamento": 34,
+    "Lead demonstrou objeção (preço, tempo, indisponibilidade)": 16,
+    "Conversa encerrada sem agendamento": 14
+  },
+  "status": {
+    "PENDING": 385,
+    "IN_PROGRESS": 89,
+    "COMPLETED": 52
+  },
+  "utm": {
+    "FACEBOOK": 232,
+    "INSTAGRAM": 182,
+    "": 112
+  },
+  "rem_counts": {
+    "PACIENTE": 2808,
+    "IA": 2508,
+    "HUMANO": 640,
+    "SISTEMA": 586
+  },
+  "por_dia": {
+    "1": 43,
+    "2": 24,
+    "3": 14,
+    "4": 9,
+    "5": 12,
+    "6": 21,
+    "7": 37,
+    "8": 43,
+    "9": 26,
+    "10": 38,
+    "11": 31,
+    "12": 26,
+    "13": 22,
+    "14": 35,
+    "15": 39,
+    "16": 31,
+    "17": 23,
+    "18": 36,
+    "19": 16
+  },
+  "vacuo_ponto": {
+    "Abertura (1ª msg)": 78,
+    "Após 2 msgs da IA": 5,
+    "Após 8 msgs da IA": 3,
+    "Após 6 msgs da IA": 2,
+    "Após 3 msgs da IA": 1
+  },
+  "total_msgs": 6542
+}

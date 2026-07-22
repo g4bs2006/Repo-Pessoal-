@@ -1,0 +1,815 @@
+# BACKLOG EXECUTÁVEL — Plataforma Contact (Escala Agenda 2.0)
+
+> **Versão:** 2.0 · **Gerado em:** 15/06/2026 · **Base:** `docs/requisitos-do-sistema.md` + `docs/arquitetura-e-componentes.md`
+> **Código-base:** `Agenda---Contact-` (Next.js 16.2.6 + React 19 + TS 5 + Tailwind 4 + Supabase PG17)
+> **Release atual em detalhe:** Fase 1. Fases 2 e 3 ficam em nível de story (a detalhar no início de cada fase).
+
+**Legenda de status:** 🔲 todo · 🔄 doing · 👀 review · ✅ done · ⛔ blocked
+**Esforço relativo:** P (≤ ½ dia) · M (~1 dia) · G (teto de 1 dia, risco — subdividir se estourar)
+
+**Convenções do projeto (validadas no código real):**
+- Rotas API usam `withAuth(handler, allowedRoles?)`, `ok()`, `err()` de `@/lib/api`. RBAC já é suportado pelo 2º argumento de `withAuth`.
+- DB via `supabaseAdmin` de `@/lib/supabase`; toda tabela tem `account_id` (multi-tenant, RLS).
+- Validação de input com `zod`.
+- Integração Helena centralizada em `@/lib/helena.ts` (`helenaFetch`, Bearer token via env). Status enum atual: `confirmed|in_progress|completed|cancelled|no_show`.
+- Tipos do banco em `src/types/database.ts` (regenerar após cada migration).
+- ⚠️ Esta versão do Next.js tem breaking changes — ler `node_modules/next/dist/docs/` antes de codar padrões novos (ver `Agenda---Contact-/AGENTS.md`).
+
+---
+
+## 1. VISÃO GERAL DO BACKLOG
+
+### 1.1 Épicos por fase
+
+| Épico | Fase | Nome | RFs cobertos | Detalhe |
+|---|---|---|---|---|
+| **EPIC-00** | 1 | Fundação: segurança, secrets e migrations do espelho | RNF-010/011/014, ADR 1/7/8 (infra) | Tasks completas |
+| **EPIC-01** | 1 | Integração Helena: config, espelho e vínculo de tags | RF-020, 021, 025, RI-001/003, ADR 8 | Tasks completas |
+| **EPIC-02** | 1 | Card Sync Engine + Outbox + Webhooks (núcleo de sync) | RF-022, 023, 024, RNF-013/014/015 | Tasks completas |
+| **EPIC-03** | 1 | Agenda dinâmica (correções e melhorias) | RF-001..007 | Tasks completas |
+| **EPIC-04** | 1 | Kanban próprio (frontend Contact) | RF-020, 022, 026, RNF-021/022 | Tasks completas |
+| **EPIC-05** | 1 | Paciente 360° | RF-010..013 | Tasks completas |
+| **EPIC-06** | 1 | API Pública v1 documentada + RBAC | RF-060, 070, RNF-012 | Tasks completas |
+| **EPIC-07** | 2 | Dashboard Gestão de Leads | RF-030..033 | Stories (a detalhar na Fase 2) |
+| **EPIC-08** | 2 | Lembrete D-1 + resposta do paciente | RF-050, 051 | Stories (a detalhar na Fase 2) |
+| **EPIC-09** | 2 | Webhooks de saída da plataforma | RF-061 | Stories (a detalhar na Fase 2) |
+| **EPIC-10** | 3 | Integração Clinicorp (leitura) | RF-040..042, RI-005/006 | Stories (a detalhar na Fase 3) |
+| **EPIC-11** | 3 | Dashboard Financeiro + cobrança WhatsApp | RF-043, 044 | Stories (a detalhar na Fase 3) |
+| **EPIC-12** | 3 | Financeiro na ficha do paciente | RF-014 | Stories (a detalhar na Fase 3) |
+
+### 1.2 Dependências entre épicos (Fase 1)
+
+```
+EPIC-00 (fundação)
+   ├──> EPIC-01 (config + espelho Helena)
+   │       └──> EPIC-02 (sync engine + outbox + webhooks)  [GARGALO CRÍTICO]
+   │               ├──> EPIC-03 (agenda dispara sync de status)
+   │               ├──> EPIC-04 (kanban move cards via engine)
+   │               └──> EPIC-05 (paciente 360° mostra/move card)
+   └──> EPIC-06 (RBAC base) ──> consumido por todos; API pública depende de 02/03/04/05
+```
+
+- **EPIC-00 destrava tudo** (secrets, migrations, RBAC base).
+- **EPIC-02 é o gargalo crítico** — agenda (03), kanban (04) e paciente (05) dependem da Card Sync Engine. As partes *visuais puras* de 03/04/05 podem começar em paralelo com mocks.
+- **EPIC-06** (API pública/OpenAPI) é o último da Fase 1: documenta o que 02/03/04/05 expõem.
+
+### 1.3 Ordem de execução sugerida (sprints — equipe a definir)
+
+| Sprint | Foco | Épicos/Tasks |
+|---|---|---|
+| **S1 — Fundação** | Destravar o resto | EPIC-00 inteiro + EPIC-01 (config + espelho) |
+| **S2 — Núcleo de sync** | Coração do sistema | EPIC-02 (engine, outbox, webhooks) + início EPIC-03 (correções sem sync) |
+| **S3 — Agenda + Kanban** | UX operacional | Conclui EPIC-03; EPIC-04 (kanban) |
+| **S4 — Paciente + API** | Fecha Fase 1 | EPIC-05 (360°) + EPIC-06 (API pública/RBAC/OpenAPI) |
+
+### 1.4 Riscos ativos
+
+- **R1 — `PUT /crm/v2/panel/card/{id}` pode não mover etapa em alguns painéis.** Mitigação: fallback duplicate/delete+create (TASK-021). Validado em produção (Salutar) mas confirmar por conta.
+- **R2 — Eventos reais de webhook Helena não inventariados** (Doc 2 §9.1). Mitigação: TASK-026 (PoC) antes de codar o receiver.
+- **R3 — Tags são UUIDs pré-criados manualmente na Helena** (API não cria). Bloqueia EPIC-01. Mitigação: TASK-012 (pré-requisito humano).
+- **R4 — Token Helena exposto.** Risco ativo → TASK-001 (rotação) é o item #1 absoluto.
+- **R5 — Prefixos de path da Helena divergentes.** O código real usa `/core/v1/...` e `/chat/v1/...`; o briefing cita `/crm/v2/...` para cards. Confirmar prefixo por endpoint na TASK-010 antes de generalizar.
+
+### 1.5 Pendências para o analista (lacunas encontradas na decomposição)
+
+- **PEND-1 [RESOLVIDA 15/06]:** Endpoint canônico de movimentação = `PUT /crm/v2/panel/card/{cardId}` (validado em produção no workflow Salutar). Doc 2 §3/§7 corrigido para refletir o path real; `/v3/panel-card` descartado.
+- **PEND-2:** `account_integrations` com Supabase Vault (Doc 2 §4.2) — confirmar se Vault está habilitado no projeto ou se usaremos coluna cifrada via `pgcrypto`. Assumido: tabela `account_integrations` + Vault, com fallback `pgcrypto`.
+- **PEND-3:** O status de appointment tem 5 valores; o funil tem 9 etapas. Os estados "não fechou"/"fechou"/"reagendado"/"não agendado" não existem como status — serão derivados (desfecho pós-`completed`, evento de reschedule, lead sem appointment). Confirmar modelagem em TASK-022.
+
+---
+
+## 2. ÉPICOS DA FASE 1 (DETALHE COMPLETO)
+
+---
+
+## EPIC-00 — Fundação: segurança, secrets e migrations do espelho
+
+**Objetivo:** preparar o terreno seguro e o esquema de dados antes de qualquer integração: rotacionar o token vazado, criar o cofre de credenciais por conta, criar todas as tabelas novas (espelho Helena, outbox, webhooks, mapeamentos) com RLS e estabelecer a base de RBAC.
+**RFs/RNFs:** RNF-010, RNF-011, RNF-014 (estruturas), ADR 1/7/8 (infra de dados).
+**Definition of Done do épico:**
+- [ ] Token Helena antigo revogado e novo em secret store; nada de token em cliente/repo.
+- [ ] Migrations das novas tabelas aplicadas com RLS por `account_id` e tipos regenerados.
+- [ ] `account_integrations` operacional (leitura server-side apenas).
+- [ ] Novas tabelas validadas por `get_advisors` (sem alertas de segurança RLS).
+
+### STORY-0.1 — Segurança imediata de credenciais
+> Como **responsável técnico**, quero **rotacionar o token Helena exposto e mover credenciais para um cofre por conta**, para **eliminar o risco de vazamento e suportar multi-tenant**.
+> **RFs:** RNF-010. **Critérios de aceite:** token antigo inválido; nenhuma credencial no browser/repo; chamadas externas só do backend.
+
+#### TASK-001: Rotacionar token Helena exposto e migrar para secret store
+- **Story:** STORY-0.1 · **Requisito:** RNF-010 · **Depende de:** nenhuma · **Esforço:** P · **Senioridade:** sênior/devops · **Status:** 🔲 todo
+- **Contexto:** o token Helena (`pn_...`) está exposto no workflow n8n compartilhado. É o risco de segurança #1 e deve ser o primeiro item executado.
+- **Arquivos/locais envolvidos:**
+  - Painel Helena (web) — gerar novo token e revogar o antigo.
+  - `Agenda---Contact-/.env` e Environment Variables da Vercel — atualizar `HELENA_API_TOKEN`.
+  - Workflow n8n — substituir o token hardcoded (será depreciado pelo ADR 7, mas rotacionar já).
+- **Passo a passo:**
+  1. No painel Helena, gerar novo token de API e **revogar o token antigo exposto**.
+  2. Atualizar `HELENA_API_TOKEN` no `.env` local e na Vercel (todas as envs).
+  3. Remover o token hardcoded do workflow n8n; usar credencial do n8n.
+  4. Validar com `GET /core/v1/contact/phonenumber/{phone}` de teste via `@/lib/helena.ts` (deve responder 200).
+  5. Confirmar que o token antigo agora retorna 401.
+- **Critérios de aceite:** novo token funciona; antigo retorna 401; nenhum token em arquivo versionado.
+- **Como testar:** `Invoke-RestMethod` com token antigo → 401; com novo → 200.
+- **DoD:** AC atendidos · sem token no git · checkbox no painel (§5).
+
+#### TASK-002: Tabela `account_integrations` (secrets por conta)
+- **Story:** STORY-0.1 · **Requisito:** RNF-010, RNF-011 · **Depende de:** TASK-001 · **Esforço:** M · **Senioridade:** pleno/data-engineer · **Status:** 🔲 todo
+- **Contexto:** cada clínica tem token Helena próprio (e futuramente credenciais Clinicorp). Doc 2 §4.2 exige secrets cifrados por conta, nunca expostos ao cliente.
+- **Arquivos/migrations:** `supabase/migrations/<ts>_account_integrations.sql`
+  - Tabela `account_integrations`: `id uuid pk`, `account_id uuid fk`, `provider text` (`helena`|`clinicorp`), `secrets jsonb` (cifrado), `panel_id text`, `is_active bool`, `created_at`, `updated_at`.
+  - Índice único `(account_id, provider)`.
+  - RLS por `account_id`; **nenhuma policy de SELECT para anon/cliente** — leitura só via `supabaseAdmin`.
+- **Passo a passo:**
+  1. Verificar Vault (`mcp Supabase list_extensions`); se ausente, usar `pgcrypto` (ver PEND-2).
+  2. Escrever migration com a tabela + índice único.
+  3. Habilitar RLS restrita a admin server-side.
+  4. Criar helper `getIntegration(accountId, provider)` em `src/lib/integrations.ts` (lê via `supabaseAdmin`, descriptografa).
+  5. Migrar `HELENA_API_TOKEN` global para registro por conta (seed da conta atual).
+- **Critérios de aceite:** token Helena por conta lido só server-side; cliente não consegue `SELECT`.
+- **Como testar:** chamada client-side a `account_integrations` → vazio/403; `getIntegration()` server-side retorna o token.
+- **DoD:** migration aplicada · `get_advisors` sem alerta RLS · helper testado.
+
+### STORY-0.2 — Esquema do espelho e fila de sincronização
+> Como **arquitetura**, quero **as tabelas de espelho Helena, outbox e webhooks criadas com RLS**, para **suportar leitura rápida na UI (ADR 1) e escrita confiável (RNF-014)**.
+> **RFs:** suporte a RF-020/021/022/023/024, RNF-014. **Critérios:** todas as tabelas do Doc 2 §4.1 existem com RLS.
+
+#### TASK-003: Migration do espelho Helena (`helena_panels`, `helena_steps`, `helena_cards`, `step_mappings`)
+- **Story:** STORY-0.2 · **Requisito:** RF-020, RF-021, RF-023 · **Depende de:** TASK-002 · **Esforço:** M · **Senioridade:** pleno/data-engineer · **Status:** 🔲 todo
+- **Contexto:** núcleo de dados do funil. Schema no Doc 2 §4.1.
+- **Arquivos/migrations:** `supabase/migrations/<ts>_helena_mirror.sql`
+  - `helena_panels`: `id`, `account_id fk`, `helena_panel_id text`, `title text`, `synced_at timestamptz`.
+  - `helena_steps`: `id`, `panel_id fk`, `helena_step_id text`, `name text`, `position int`.
+  - `helena_cards`: `id`, `panel_id fk`, `helena_card_id text`, `step_id fk`, `patient_id fk null`, `lead_name text`, `appt_date date`, `appt_time time`, `unit_tag text`, `crc_tag text`, `origin_tag text`, `closed_value numeric`, `status text`, `description text`, `tag_ids text[]`, `updated_at timestamptz`.
+  - `step_mappings`: `id`, `account_id fk`, `appointment_status text`, `target_step_id fk` (configurável por conta — ADR 5).
+- **Passo a passo:**
+  1. Criar as 4 tabelas com FKs e índices: `(account_id)`, `helena_card_id` único por conta, `(account_id, appointment_status)` único em `step_mappings`.
+  2. RLS por `account_id` em todas.
+  3. Habilitar Realtime (publication) em `helena_cards` (RNF-021).
+  4. Regenerar tipos (`generate_typescript_types` → `src/types/database.ts`).
+- **Critérios de aceite:** tabelas existem com RLS; `helena_cards` na publication de Realtime; tipos atualizados.
+- **Como testar:** `mcp Supabase list_tables` lista as 4; `get_advisors` sem alerta.
+- **DoD:** migration aplicada · RLS ok · tipos regenerados.
+
+#### TASK-004: Migration outbox/webhooks/log (`sync_outbox`, `webhook_events`, `sync_log`)
+- **Story:** STORY-0.2 · **Requisito:** RNF-013, RNF-014, RF-024 · **Depende de:** TASK-003 · **Esforço:** M · **Senioridade:** pleno/data-engineer · **Status:** 🔲 todo
+- **Contexto:** entrega confiável (outbox + retry) e idempotência de webhooks. Doc 2 §3/§4.1.
+- **Arquivos/migrations:** `supabase/migrations/<ts>_sync_infra.sql`
+  - `sync_outbox`: `id`, `account_id fk`, `operation text`, `payload jsonb`, `origin text` (`platform`|`helena`|`n8n`), `attempts int default 0`, `status text` (`pending`|`done`|`failed`), `next_retry_at timestamptz`, `last_error text`, `created_at`.
+  - `webhook_events`: `id`, `account_id fk`, `helena_event_id text unique`, `event_type text`, `payload jsonb`, `status text`, `received_at`.
+  - `sync_log`: `id`, `account_id fk`, `card_id fk null`, `direction text`, `result text`, `detail jsonb`, `created_at`.
+- **Passo a passo:**
+  1. Criar tabelas com índices: `sync_outbox(status, next_retry_at)`, `webhook_events(helena_event_id)` único.
+  2. RLS por `account_id`.
+  3. Regenerar tipos.
+- **Critérios de aceite:** dedup garantido por unique em `helena_event_id`; outbox pesquisável por status+retry.
+- **Como testar:** inserir 2 webhook_events com mesmo `helena_event_id` → 2º falha (unique).
+- **DoD:** migration aplicada · índices conferidos · tipos regenerados.
+
+#### TASK-005: Alterações em tabelas existentes (`patients`, `appointments`)
+- **Story:** STORY-0.2 · **Requisito:** RF-012, RF-006, RF-050 (campo), RF-023 · **Depende de:** TASK-003 · **Esforço:** P · **Senioridade:** pleno/data-engineer · **Status:** 🔲 todo
+- **Contexto:** Doc 2 §4.1 "Alterações em tabelas existentes".
+- **Arquivos/migrations:** `supabase/migrations/<ts>_alter_patients_appointments.sql`
+  - `patients`: `+ helena_contact_id text`, `+ helena_lead_id text`, `+ phone_e164 text`.
+  - `appointments`: `+ closed_value numeric`, `+ closed_at timestamptz`, `+ confirmation_status text`, `+ last_sync_status text`.
+- **Passo a passo:**
+  1. `ALTER TABLE` com colunas nuláveis (não quebra dados).
+  2. Backfill `phone_e164` (normalização E.164).
+  3. Índice único parcial `(account_id, phone_e164) where phone_e164 is not null`.
+  4. Regenerar tipos.
+- **Critérios de aceite:** colunas existem; backfill sem duplicidade de telefone por conta.
+- **Como testar:** consulta de paciente retorna novos campos.
+- **DoD:** migration aplicada · backfill validado · tipos regenerados.
+
+---
+
+## EPIC-01 — Integração Helena: config, espelho e vínculo de tags
+
+**Objetivo:** permitir que o admin conecte a conta à Helena (token, painel, mapeamento de etapas, vínculo de tags) e popular o espelho local de painéis/etapas/cards.
+**RFs:** RF-020, RF-021, RF-025, RI-001, RI-003, ADR 8.
+**DoD do épico:**
+- [ ] Admin configura token + painel + mapeamento etapa↔StepId + vínculo de tags na UI.
+- [ ] Espelho de painéis/etapas/cards sincronizado (carga inicial paginada).
+- [ ] Tags listadas via `GET /v1/tag` e vinculadas (UUID↔significado).
+
+### STORY-1.1 — Cliente Helena de painéis/cards/tags
+> Como **backend**, quero **funções tipadas para ler painéis, cards e tags da Helena**, para **alimentar o espelho e a configuração**.
+> **RFs:** RI-001, RI-003. **Critérios:** funções cobrem painel, etapas, cards (paginado), tags e busca de card por contato.
+
+#### TASK-010: Estender `@/lib/helena.ts` com endpoints de painel/card/tag
+- **Story:** STORY-1.1 · **Requisito:** RI-001, RI-003 · **Depende de:** TASK-002 · **Esforço:** M · **Senioridade:** pleno · **Status:** 🔲 todo
+- **Contexto:** o `helena.ts` atual só tem contato/sessão/mensagem. Precisamos de painéis, cards e tags. ⚠️ R5: confirmar prefixos reais por endpoint antes de generalizar.
+- **Arquivos:** `Agenda---Contact-/src/lib/helena.ts` (alterar — adicionar funções).
+- **Funções a criar:**
+  - `listPanels()` → `GET /crm/v2/panel`
+  - `getPanel(id)` → `GET /crm/v1/panel/{id}` (estrutura + etapas/StepId)
+  - `getCardByContact(panelId, contactId)` → `GET /crm/v1/panel/card?PanelId=&ContactId=&PageSize=`
+  - `listPanelCards(panelId, page, pageSize=100)` → paginação para carga inicial
+  - `moveCard(cardId, { stepId, description, tagIds })` → `PUT /crm/v2/panel/card/{cardId}` body `{ fields:["StepId","Description","TagIds"], stepId, description, tagIds }`
+  - `listTags()` → `GET /v1/tag`
+  - `getCardNotes(cardId)` / `createCardNote(cardId, text)` → `/v1/panel-card/{cardId}/note`
+  - Refatorar `helenaFetch` para receber `token` por conta (de TASK-002) além do env global.
+- **Passo a passo:**
+  1. Para cada endpoint, fazer 1 chamada de inventário em conta real e salvar o shape como tipo/comentário.
+  2. Implementar funções com tipos de retorno explícitos.
+  3. `moveCard` deve aceitar token por conta.
+- **Critérios de aceite:** funções retornam dados tipados de conta real; `moveCard` move um card de teste e volta.
+- **Como testar:** script manual move um card A→B→A na Helena.
+- **DoD:** funções testadas contra API real · prefixos confirmados (R5) · tipos definidos.
+
+### STORY-1.2 — Tela de configuração Helena (admin)
+> Como **admin da clínica**, quero **conectar minha conta à Helena e mapear etapas e tags**, para **operar o funil com identidade Contact** (ADR 8).
+> **RFs:** RF-021, RF-025. **Critérios:** token salvo cifrado, painel selecionado, 9 etapas mapeadas, tags vinculadas por família.
+
+#### TASK-011: Endpoint + aba de configuração "Integração Helena"
+- **Story:** STORY-1.2 · **Requisito:** RF-021 · **Depende de:** TASK-010, TASK-002 · **Esforço:** M · **Senioridade:** pleno · **Status:** 🔲 todo
+- **Contexto:** Doc 2 §2.1 — Configurações ganha aba "Integração Helena".
+- **Arquivos:**
+  - `src/app/api/admin/integrations/helena/route.ts` (criar — GET/PUT; `withAuth(handler, ['admin'])`).
+  - `src/app/[accountId]/configuracoes/page.tsx` (alterar — adicionar aba).
+  - `src/components/config/HelenaIntegrationTab.tsx` (criar).
+- **Passo a passo:**
+  1. `PUT` salva token (cifrado via TASK-002), `panel_id` e `step_mappings`. `GET` retorna config (sem expor token bruto).
+  2. UI: campo de token + "Testar conexão" (`listPanels`), `select` de painel, tabela mapeando as 9 etapas → StepId real (de `getPanel`).
+  3. Persistir mapeamento em `step_mappings` e etapas em `helena_steps`.
+  4. Tokens de marca (§2.3): botão `bg-brand`, foco `ring-brand-border`.
+- **Critérios de aceite:** admin salva token + painel + 9 etapas; "Testar conexão" valida; recepcionista não acessa (RBAC).
+- **Como testar:** salvar, recarregar, mapeamento persiste; não-admin → 403.
+- **DoD:** RBAC admin no backend · mapeamento persistido · tokens de marca.
+
+#### TASK-012: [PRÉ-REQUISITO HUMANO] Cadastrar tags faltantes na Helena
+- **Story:** STORY-1.2 · **Requisito:** RF-025, ADR 8 · **Depende de:** nenhuma (paralelo) · **Esforço:** P · **Senioridade:** operação/admin · **Status:** 🔲 todo
+- **Contexto:** a API Helena NÃO cria tags (R3); devem existir antes de vincular.
+- **Passo a passo (manual no painel Helena):**
+  1. Criar 1 tag por unidade (ex.: `ELDORADO`).
+  2. Criar 1 tag por CRC (ex.: `AGENDADOS ANA`, `AGENDADO IA`) — até 4 por clínica.
+  3. Confirmar tags de canal (INSTAGRAM, GOOGLE, FACEBOOK, ORGÂNICO, INDICAÇÃO).
+- **Critérios de aceite:** todas as tags aparecem em `GET /v1/tag`.
+- **Como testar:** `listTags()` retorna todas com seus UUIDs.
+- **DoD:** lista de UUIDs documentada para TASK-013.
+
+#### TASK-013: Tela de vínculo de tags (UUID ↔ significado)
+- **Story:** STORY-1.2 · **Requisito:** RF-025, ADR 8 · **Depende de:** TASK-012, TASK-011 · **Esforço:** M · **Senioridade:** pleno · **Status:** 🔲 todo
+- **Contexto:** o admin associa cada tag UUID a um significado (unidade/CRC/canal) — base dos filtros dos dashboards (RF-031).
+- **Arquivos:**
+  - Migration `<ts>_tag_links.sql` — `tag_links`: `id`, `account_id`, `helena_tag_id text`, `family text` (`unit`|`crc`|`channel`), `meaning text`, `unit_id fk null`.
+  - `src/app/api/admin/integrations/helena/tags/route.ts` (criar — GET tags+vínculos; PUT vínculos).
+  - `src/components/config/TagLinkTable.tsx` (criar).
+- **Passo a passo:**
+  1. `GET` lista tags (`listTags()`) + vínculos existentes.
+  2. UI: por tag, `select` de família + campo de significado.
+  3. `PUT` persiste em `tag_links`.
+- **Critérios de aceite:** vínculo persiste e é consumível por sync (TASK-022) e dashboards (Fase 2).
+- **Como testar:** vincular `ELDORADO`→family=unit; recarregar; mantém.
+- **DoD:** migration + endpoint + UI · RBAC admin.
+
+### STORY-1.3 — Carga inicial do espelho de painéis/cards
+> Como **sistema**, quero **popular o espelho local a partir da Helena**, para **a UI ler rápido (ADR 1) e o kanban funcionar**.
+> **RFs:** RF-020, RF-021. **Critérios:** painéis, etapas e cards no espelho; reconciliação diária prevista.
+
+#### TASK-014: Panel Mirror Service — sync inicial paginado
+- **Story:** STORY-1.3 · **Requisito:** RF-020, RF-021, RNF-015 · **Depende de:** TASK-010, TASK-003, TASK-011 · **Esforço:** G · **Senioridade:** sênior · **Status:** 🔲 todo
+- **Contexto:** Doc 2 §3 Panel Mirror Service. Carga completa (paginada 100/pág) → espelho.
+- **Arquivos:**
+  - `src/lib/sync/panelMirror.ts` (criar — `syncPanel(accountId)`).
+  - `src/app/api/admin/integrations/helena/sync/route.ts` (criar — POST, admin-only).
+- **Passo a passo:**
+  1. `syncPanel`: lê `panel_id` da config → `getPanel` (upsert `helena_steps`) → `listPanelCards` paginado (upsert `helena_cards`).
+  2. Resolver `patient_id` por telefone (E.164) quando possível; senão manter `lead_name`.
+  3. Resolver `tag_ids` → `unit_tag`/`crc_tag`/`origin_tag` via `tag_links` (TASK-013).
+  4. Telefone duplicado → card `status='pending_link'` (resolução manual — Doc 2 §7).
+  5. Gravar `synced_at`.
+- **Critérios de aceite:** após sync, `helena_cards` reflete o painel real; etapas na ordem certa; tags resolvidas.
+- **Como testar:** POST sync; comparar contagem por etapa com o painel Helena.
+- **DoD:** carga idempotente (upsert) · paginação 100 · checkbox.
+
+---
+
+## EPIC-02 — Card Sync Engine + Outbox + Webhooks (núcleo de sync)
+
+**Objetivo:** implementar o single writer de cards (ADR 7): toda movimentação passa pela engine do backend, é entregue via outbox com retry, e o inbound (webhook) atualiza o espelho com anti-loop. **Épico crítico — destrava 03/04/05.**
+**RFs:** RF-022, RF-023, RF-024, RNF-013, RNF-014, RNF-015.
+**DoD do épico:**
+- [ ] Mover card pela plataforma reflete na Helena ≤5s (RNF-002) com tags em merge e description preservada.
+- [ ] Transição de status na agenda move o card automaticamente (RF-023).
+- [ ] Webhook inbound atualiza espelho ≤10s, idempotente, sem loop.
+- [ ] Falha de escrita → retry ×5 + badge "sync pendente" + log.
+
+### STORY-2.1 — Outbox Worker com retry
+> Como **sistema**, quero **uma fila de saída confiável para a Helena**, para **garantir entrega mesmo com indisponibilidade (RNF-014)**.
+
+#### TASK-020: Outbox Worker (processamento + retry exponencial)
+- **Story:** STORY-2.1 · **Requisito:** RNF-014, RNF-015 · **Depende de:** TASK-004, TASK-010 · **Esforço:** G · **Senioridade:** sênior · **Status:** 🔲 todo
+- **Contexto:** Doc 2 §3 Outbox Worker. Processa `sync_outbox` FIFO por card, retry ×5, marca `sync_log`.
+- **Arquivos:**
+  - `src/lib/sync/outboxWorker.ts` (criar — `processOutbox(batch)`).
+  - `src/app/api/internal/outbox/tick/route.ts` (criar — chamado por cron Vercel; protegido por secret).
+  - `vercel.json` (alterar — cron a cada 1min para `/api/internal/outbox/tick`).
+- **Passo a passo:**
+  1. Selecionar `status='pending' and next_retry_at <= now()` ordenado por card.
+  2. Executar `operation` (ex.: `move_card` → `moveCard`).
+  3. Sucesso → `done` + `sync_log`. Falha → `attempts++`, `next_retry_at = now + backoff`, `last_error`. Após 5 → `failed` + `appointments.last_sync_status='failed'`/card badge.
+  4. Respeitar rate limit (backoff em 429).
+- **Critérios de aceite:** item entregue ≤5s normal; após 5 falhas → failed + badge.
+- **Como testar:** enfileirar move com token inválido → 5 tentativas → failed; válido → done.
+- **DoD:** retry exponencial · cron configurado · sync_log gravado.
+
+#### TASK-021: Fallback de movimentação (duplicate/delete+create)
+- **Story:** STORY-2.1 · **Requisito:** RNF-014, RF-022 (R1) · **Depende de:** TASK-020 · **Esforço:** M · **Senioridade:** sênior · **Status:** 🔲 todo
+- **Contexto:** R1 — risco do `PUT` não mover etapa. Doc 2 §7 define fallback duplicate/delete+create.
+- **Arquivos:** `src/lib/sync/outboxWorker.ts` (alterar).
+- **Passo a passo:**
+  1. Após `moveCard`, reler o card e confirmar `stepId` aplicado.
+  2. Se não mudou → criar card na etapa destino (preservando description+tags merge) + deletar antigo; atualizar `helena_card_id` no espelho.
+  3. Registrar estratégia em `sync_log`.
+- **Critérios de aceite:** se `PUT` não mover, fallback garante a etapa; espelho aponta para o novo card id.
+- **Como testar:** simular painel onde PUT não move (mock) → fallback executa.
+- **DoD:** verificação pós-move · fallback testado · log da estratégia.
+
+### STORY-2.2 — Card Sync Engine (status ⇄ etapa)
+> Como **sistema**, quero **traduzir eventos da agenda em movimentações de card e aplicar eventos inbound**, para **manter agenda e funil sempre conversando (ADR 7)**.
+
+#### TASK-022: Card Sync Engine — outbound (status → etapa) com merge de tags e description
+- **Story:** STORY-2.2 · **Requisito:** RF-022, RF-023 · **Depende de:** TASK-020, TASK-014, TASK-013 · **Esforço:** G · **Senioridade:** sênior · **Status:** 🔲 todo
+- **Contexto:** coração do RF-023. Recebe domain event da agenda e enfileira a movimentação. Regras: `tagIds` SEMPRE merge; `description` preservada/anexada (resumo da IA). PEND-3: desfechos derivados pós-`completed`.
+- **Arquivos:**
+  - `src/lib/sync/cardSyncEngine.ts` (criar — `enqueueCardMove(accountId, event)`).
+  - `src/lib/sync/statusToStep.ts` (criar — mapa via `step_mappings`).
+- **Mapa de eventos (RF-023):** criada→AGENDADOS · cancelled→CANCELOU · reagendada→REAGENDADO · no_show→FALTOU · completed→COMPARECIDO · "não fechou"→COMPARECEU E NÃO FECHOU · fechou(+valor)→COMPARECEU E FECHOU · lead sem appointment→NÃO AGENDADO.
+- **Passo a passo:**
+  1. Resolver `helena_card_id` do paciente (espelho ou `getCardByContact`); se inexistente, criar card.
+  2. Resolver `target_step_id` via `step_mappings`.
+  3. Montar `description`: ler atual + anexar/atualizar bloco estruturado (📅 consulta, 👤 lead, 📋 resumo, 🎯 status/estágio, 🦷 dor, 🔜 instrução) **sem sobrescrever**.
+  4. Montar `tagIds`: tags atuais + unidade + CRC (ou `AGENDADO IA`) — **dedup, merge**.
+  5. "Fechou": incluir `closed_value`.
+  6. Enfileirar em `sync_outbox` com `origin='platform'`.
+- **Critérios de aceite:** cada evento gera etapa correta; tags nunca substituem (só somam); description preservada.
+- **Como testar:** evento `cancelled` → outbox com stepId de CANCELOU + tags merge; description intacta.
+- **DoD:** merge verificado · description preservada · 8 eventos cobertos.
+
+#### TASK-023: Domain events na agenda (hook de status → engine)
+- **Story:** STORY-2.2 · **Requisito:** RF-006, RF-023 · **Depende de:** TASK-022 · **Esforço:** M · **Senioridade:** pleno · **Status:** 🔲 todo
+- **Contexto:** ligar a agenda existente à engine. Doc 2 §3 — toda transição de status emite domain event.
+- **Arquivos:**
+  - `src/app/api/appointments/[id]/status/route.ts` (alterar — após update, chamar `enqueueCardMove`).
+  - `src/app/api/appointments/route.ts` (alterar — após criar, enfileirar AGENDADOS).
+  - `src/app/api/appointments/[id]/route.ts` (alterar — reschedule → REAGENDADO).
+- **Passo a passo:**
+  1. No PATCH de status: após `ok(data)`, chamar `enqueueCardMove(accountId, { type: status, appointment })` (fire-and-enqueue, não bloquear resposta).
+  2. No POST: enfileirar `created`→AGENDADOS.
+  3. No PATCH reschedule: enfileirar `rescheduled`→REAGENDADO com nova data/hora.
+  4. `completed`→COMPARECIDO; "fechou"/"não fechou" vêm de ação separada (TASK-035/043).
+- **Critérios de aceite:** "Cancelar" enfileira move para CANCELOU; criação enfileira AGENDADOS.
+- **Como testar:** PATCH status=cancelled → registro em `sync_outbox` (origin=platform).
+- **DoD:** 3 rotas ligadas à engine · não bloqueia resposta.
+
+### STORY-2.3 — Webhook Receiver (inbound) com anti-loop
+> Como **sistema**, quero **receber eventos da Helena e atualizar o espelho idempotente e sem loop**, para **refletir mudanças feitas na Helena/n8n (RF-024)**.
+
+#### TASK-026: [PoC] Inventariar eventos reais de webhook Helena
+- **Story:** STORY-2.3 · **Requisito:** RF-024 (R2) · **Depende de:** TASK-010 · **Esforço:** P · **Senioridade:** sênior · **Status:** 🔲 todo
+- **Contexto:** R2 — eventos reais não inventariados (Doc 2 §9.1). Necessário antes do receiver.
+- **Passo a passo:**
+  1. `GET /v1/webhook-event` (listar tipos) e documentar payloads.
+  2. Criar subscription de teste (`POST /v1/webhook-subscription`) apontando para endpoint de captura.
+  3. Mover um card na Helena e capturar o payload real.
+- **Critérios de aceite:** lista de event_types + shape de cada payload documentada.
+- **Como testar:** evento real capturado e anexado à task.
+- **DoD:** documentação anexada para TASK-024/025.
+
+#### TASK-024: Endpoint Webhook Receiver (validação + dedup)
+- **Story:** STORY-2.3 · **Requisito:** RF-024, RNF-013 · **Depende de:** TASK-026, TASK-004 · **Esforço:** M · **Senioridade:** sênior · **Status:** 🔲 todo
+- **Contexto:** Doc 2 §3 Webhook Receiver — `POST /api/webhooks/helena`, valida segredo, deduplica por event id.
+- **Arquivos:** `src/app/api/webhooks/helena/route.ts` (criar — rota pública com validação de segredo, NÃO usa `withAuth`).
+- **Passo a passo:**
+  1. Validar assinatura/segredo da subscription (RNF-013).
+  2. Deduplicar: inserir em `webhook_events` por `helena_event_id` (unique); se já existe, 200 e ignora.
+  3. Responder 200 rápido; processar assíncrono.
+- **Critérios de aceite:** duplicado ignorado; sem segredo válido → 401.
+- **Como testar:** enviar payload de TASK-026 duas vezes → processado uma vez.
+- **DoD:** validação de origem · idempotência · resposta rápida.
+
+#### TASK-025: Aplicar evento inbound no espelho/agenda com anti-loop
+- **Story:** STORY-2.3 · **Requisito:** RF-024 · **Depende de:** TASK-024, TASK-022 · **Esforço:** M · **Senioridade:** sênior · **Status:** 🔲 todo
+- **Contexto:** Doc 2 §7 fluxo 6 + anti-loop por `origin`.
+- **Arquivos:** `src/lib/sync/cardSyncEngine.ts` (alterar — `applyInbound(event)`).
+- **Passo a passo:**
+  1. Se `origin=platform` (nossa escrita) ou estado já confere com espelho → ignorar (anti-loop).
+  2. Atualizar `helena_cards` (etapa, tags, description, valor).
+  3. Se a etapa implica status (ex.: CANCELOU→cancelled), atualizar `appointments` **sem reenfileirar** outbound.
+  4. Realtime propaga para kanban/agenda.
+- **Critérios de aceite:** card movido na Helena reflete ≤10s; sem loop de volta.
+- **Como testar:** mover card na Helena → espelho atualiza, `sync_outbox` NÃO recebe item novo.
+- **DoD:** anti-loop verificado · status sincronizado · Realtime ok.
+
+---
+
+## EPIC-03 — Agenda dinâmica (correções e melhorias)
+
+**Objetivo:** corrigir e evoluir a agenda: seletor visual de slots, bloqueios no grid, filtros de unidade/procedimento, durações dinâmicas, validação de conflito pré-confirmação e ações rápidas com sync.
+**RFs:** RF-001..007.
+**DoD do épico:** agenda opera sem digitar horário, mostra bloqueios, filtra por unidade/procedimento, respeita durações, avisa conflito antes do submit e ações rápidas movem o card.
+
+### STORY-3.1 — Seletor visual de slots e durações dinâmicas
+> Como **recepcionista**, quero **escolher o horário numa grade visual respeitando a duração do procedimento**, para **agendar sem digitar e sem erro de horário**.
+> **RFs:** RF-001, RF-004. **Critérios:** grade de slots livres por dentista/cadeira; procedimento de 90min ocupa 3 slots.
+
+#### TASK-030: Durações dinâmicas na RPC/endpoint de slots
+- **Story:** STORY-3.1 · **Requisito:** RF-004 · **Depende de:** TASK-005 · **Esforço:** M · **Senioridade:** pleno · **Status:** 🔲 todo
+- **Contexto:** RF-004 — eliminar hardcode de 30min; respeitar duração do procedimento.
+- **Arquivos:**
+  - RPC `get_available_slots` (migration de alteração) — aceitar `procedure_duration`.
+  - `src/app/api/slots/available/route.ts` (alterar — repassar duração).
+  - `src/hooks/useSlots.ts` (alterar).
+- **Passo a passo:**
+  1. Alterar a RPC para receber duração e calcular slots considerando o intervalo completo.
+  2. Endpoint repassa duração do procedimento selecionado.
+  3. Hook expõe slots com duração.
+- **Critérios de aceite:** procedimento 90min bloqueia 3 slots de 30min.
+- **Como testar:** consultar slots para procedimento longo → intervalo correto ocupado.
+- **DoD:** RPC alterada · hardcode removido · hook atualizado.
+
+#### TASK-031: Componente SlotPicker (grade visual) no modal
+- **Story:** STORY-3.1 · **Requisito:** RF-001 · **Depende de:** TASK-030 · **Esforço:** M · **Senioridade:** pleno · **Status:** 🔲 todo
+- **Contexto:** RF-001 — substituir campo texto HH:mm por grade clicável.
+- **Arquivos:**
+  - `src/components/agenda/modals/SlotPicker.tsx` (criar).
+  - `src/components/agenda/modals/NewAppointmentModal.tsx` (alterar — usar SlotPicker).
+- **Passo a passo:**
+  1. SlotPicker consome `useSlots` (dentista, unidade, procedimento, data) → grade clicável com cadeira sugerida.
+  2. Slots ocupados/bloqueados não aparecem como disponíveis.
+  3. Tokens de marca: slot selecionado `bg-brand`/`ring-brand-border`.
+- **Critérios de aceite:** usuário agenda sem digitar; ocupados não aparecem.
+- **Como testar:** abrir modal, selecionar dentista/data, clicar num slot → horário preenchido.
+- **DoD:** campo texto removido · grade funcional · tokens aplicados.
+
+### STORY-3.2 — Bloqueios e filtros no grid
+> Como **recepcionista**, quero **ver bloqueios e filtrar por unidade e procedimento**, para **entender a agenda real e focar no que importa**.
+> **RFs:** RF-002, RF-003. **Critérios:** almoço 12-13h aparece como bloco; filtro de unidade persiste ao navegar datas.
+
+#### TASK-032: Renderizar `schedule_blocks` e expediente no grid
+- **Story:** STORY-3.2 · **Requisito:** RF-002 · **Depende de:** nenhuma (paralelo) · **Esforço:** M · **Senioridade:** pleno · **Status:** 🔲 todo
+- **Contexto:** RF-002 — `schedule_blocks` existe no banco mas não é renderizado.
+- **Arquivos:**
+  - `src/components/agenda/views/DailyView.tsx` e `WeeklyView.tsx` (alterar — renderizar blocos + sombrear fora de expediente).
+  - endpoint de blocks (`/api/admin/dentists/[id]/blocks` existente) ou hook.
+- **Passo a passo:**
+  1. Buscar blocks do período por dentista.
+  2. Renderizar bloco visual diferenciado (almoço/ausência/reunião/reservado) na coluna do dentista.
+  3. Sombrear horários fora de `dentist_schedules`.
+  4. Impedir agendamento sobre bloco pela UI.
+- **Critérios de aceite:** bloqueio 12-13h aparece; não é possível agendar sobre ele pela UI.
+- **Como testar:** criar bloco de almoço → aparece nas views dia/semana.
+- **DoD:** blocos nas 2 views · expediente sombreado · bloqueio de UI.
+
+#### TASK-033: Filtros de unidade e procedimento na agenda
+- **Story:** STORY-3.2 · **Requisito:** RF-003 · **Depende de:** nenhuma (paralelo) · **Esforço:** M · **Senioridade:** pleno · **Status:** 🔲 todo
+- **Contexto:** RF-003 — filtros combináveis com os existentes (dentista, status, busca).
+- **Arquivos:**
+  - `src/components/agenda/AgendaSidebar.tsx` ou `AgendaHeader.tsx` (alterar — selects unidade/procedimento).
+  - `src/hooks/useAppointments.ts` (alterar — aceitar filtros).
+  - `src/app/api/appointments/route.ts` (alterar — filtrar por unit_id/procedure_id).
+- **Passo a passo:**
+  1. Adicionar selects de unidade e procedimento.
+  2. Propagar ao hook/endpoint; filtro de unidade → só dentistas/consultas daquela unidade.
+  3. Persistir filtros ao navegar entre datas (estado/URL).
+- **Critérios de aceite:** filtro de unidade persiste ao trocar de data; filtros combináveis.
+- **Como testar:** filtrar unidade, mudar de dia → filtro mantido.
+- **DoD:** filtros combináveis · persistência · tokens nos chips ativos.
+
+### STORY-3.3 — Conflito pré-confirmação e ações rápidas
+> Como **recepcionista**, quero **ser avisada de conflito antes de confirmar e ter ações de 1 clique que movem o card**, para **evitar overbooking e manter o funil sincronizado**.
+> **RFs:** RF-005, RF-006, RF-007. **Critérios:** aviso de conflito com sugestão de slot; "Cancelar" move card em ≤5s.
+
+#### TASK-034: Validação de conflito pré-confirmação no modal
+- **Story:** STORY-3.3 · **Requisito:** RF-005 · **Depende de:** TASK-031 · **Esforço:** M · **Senioridade:** pleno · **Status:** 🔲 todo
+- **Contexto:** RF-005 — verificação só ocorria no submit; trazer para antes da confirmação.
+- **Arquivos:**
+  - `src/components/agenda/modals/NewAppointmentModal.tsx` (alterar — consultar `check-conflicts` ao selecionar slot).
+  - usa `src/app/api/appointments/check-conflicts/route.ts` (existente).
+- **Passo a passo:**
+  1. Ao selecionar slot, chamar `check-conflicts` (dentista, cadeira, paciente).
+  2. Exibir aviso visual de sobreposição antes do submit, com sugestão do próximo slot livre.
+- **Critérios de aceite:** tentativa em horário ocupado mostra aviso antes do submit com sugestão.
+- **Como testar:** selecionar slot ocupado → aviso, submit bloqueado.
+- **DoD:** verificação pré-submit · sugestão de slot · UI clara.
+
+#### TASK-035: Ações rápidas no AppointmentPopover com captura de valor
+- **Story:** STORY-3.3 · **Requisito:** RF-006 · **Depende de:** TASK-023 · **Esforço:** M · **Senioridade:** pleno · **Status:** 🔲 todo
+- **Contexto:** RF-006 — popover com Confirmar/Compareceu/Faltou/Cancelar/Reagendar/Fechou; cada ação dispara a engine (RF-023).
+- **Arquivos:** `src/components/agenda/AppointmentPopover.tsx` (alterar).
+- **Passo a passo:**
+  1. Botões de ação rápida → `PATCH /appointments/{id}/status` (já enfileira via TASK-023).
+  2. "Fechou": input de valor (R$), grava `closed_value`/`closed_at`, enfileira COMPARECEU E FECHOU.
+  3. Update otimista (Doc 2 §2.2).
+  4. Badge "sync pendente" quando `last_sync_status='failed'`.
+- **Critérios de aceite:** "Cancelar" move card AGENDADOS→CANCELOU ≤5s; "Fechou" captura valor.
+- **Como testar:** clicar Cancelar → status muda + card movido; Fechou → input + COMPARECEU E FECHOU.
+- **DoD:** 6 ações · captura de valor · badge de sync.
+
+#### TASK-036: Reagendamento por drag-and-drop (Could)
+- **Story:** STORY-3.3 · **Requisito:** RF-007 · **Depende de:** TASK-035 · **Esforço:** M · **Senioridade:** pleno · **Status:** 🔲 todo · *(Could — pode ficar para o fim da Fase 1)*
+- **Contexto:** RF-007 — arrastar bloco para outro horário/dentista reagenda com validação, movendo card para REAGENDADO.
+- **Arquivos:** `src/components/agenda/views/DailyView.tsx`/`WeeklyView.tsx` + `AppointmentBlock.tsx` (alterar).
+- **Passo a passo:**
+  1. `AppointmentBlock` arrastável; drop calcula novo horário/dentista.
+  2. Validar conflito no drop; válido → `PATCH /appointments/{id}` (reschedule) → REAGENDADO; inválido → reverte com aviso.
+- **Critérios de aceite:** drop válido reagenda; inválido reverte.
+- **Como testar:** arrastar para slot livre → reagenda; para ocupado → reverte.
+- **DoD:** DnD funcional · validação no drop · card REAGENDADO.
+
+---
+
+## EPIC-04 — Kanban próprio (frontend Contact)
+
+**Objetivo:** tela kanban com as 9 etapas e identidade Contact, lendo do espelho, com drag-and-drop que move cards via Card Sync Engine, modal do card (notas/valor/links) e Realtime.
+**RFs:** RF-020, RF-022, RF-026, RNF-021, RNF-022.
+**DoD do épico:** cliente opera o funil inteiro sem abrir a Helena; mover card reflete na Helena ≤5s; Realtime atualiza sem refresh.
+
+### STORY-4.1 — Board kanban com identidade Contact
+> Como **recepcionista/gestor**, quero **ver e operar o funil num kanban bonito**, para **gerir leads sem usar a interface da Helena**.
+> **RFs:** RF-020, RNF-022. **Critérios:** 9 colunas na ordem do painel real; contagem e soma por coluna; Realtime.
+
+#### TASK-040: Tokens de marca no tema global (`@theme`)
+- **Story:** STORY-4.1 · **Requisito:** RNF-022, Doc 2 §2.3 · **Depende de:** nenhuma (paralelo) · **Esforço:** P · **Senioridade:** pleno/ux · **Status:** 🔲 todo
+- **Contexto:** Doc 2 §2.3 — declarar tokens da marca (Tailwind 4 `@theme`) e utilities (`bg-brand`, `text-brand`, `ring-brand-border`). Base visual de todo o épico.
+- **Arquivos:** `src/app/globals.css` (alterar — `@theme` com `--brand`, `--brand-solid`, `--brand-light`, `--brand-text`, `--brand-border`).
+- **Passo a passo:**
+  1. Declarar os 5 tokens (§2.3): gradiente `#7C3AED→#C026D3→#DC2626`, solid `#9333EA`, light `#faf5ff`, text `#7C3AED`, border `rgba(147,51,234,0.3)`.
+  2. Mapear utilities `bg-brand`, `text-brand`, `ring-brand-border`, `bg-brand-light`.
+  3. Cores semânticas (verde `#16a34a`, vermelho `#dc2626`).
+- **Critérios de aceite:** `bg-brand` rende o gradiente; utilities disponíveis no app.
+- **Como testar:** aplicar `bg-brand` num botão → gradiente correto.
+- **DoD:** tokens no globals.css · utilities funcionando.
+
+#### TASK-041: Hook `usePanelCards` + endpoint de leitura do espelho
+- **Story:** STORY-4.1 · **Requisito:** RF-020, RNF-001, RNF-021 · **Depende de:** TASK-014, TASK-003 · **Esforço:** M · **Senioridade:** pleno · **Status:** 🔲 todo
+- **Contexto:** Doc 2 §2.2 — novo hook `usePanelCards` com revalidação por Realtime.
+- **Arquivos:**
+  - `src/app/api/panels/cards/route.ts` (criar — GET cards do espelho por painel/filtros).
+  - `src/hooks/usePanelCards.ts` (criar — leitura + assinatura Realtime de `helena_cards`).
+- **Passo a passo:**
+  1. Endpoint lê `helena_cards` + `helena_steps` do espelho (nunca da Helena direto — ADR 1).
+  2. Hook assina Realtime por `account_id` e revalida ao mudar.
+- **Critérios de aceite:** cards carregam do espelho <1,5s; mudança reflete sem refresh.
+- **Como testar:** atualizar card no banco → UI reflete via Realtime.
+- **DoD:** leitura só do espelho · Realtime ativo.
+
+#### TASK-042: Componente KanbanBoard (9 colunas + cards)
+- **Story:** STORY-4.1 · **Requisito:** RF-020, RF-021 · **Depende de:** TASK-040, TASK-041 · **Esforço:** G · **Senioridade:** pleno · **Status:** 🔲 todo
+- **Contexto:** Doc 2 §2.1 — kanban com 9 colunas, cards com nome/data/horário/etiquetas, contagem e soma por coluna.
+- **Arquivos:**
+  - `src/app/[accountId]/paineis/page.tsx` (criar — rota).
+  - `src/components/kanban/KanbanBoard.tsx`, `KanbanColumn.tsx`, `KanbanCard.tsx` (criar).
+- **Passo a passo:**
+  1. Renderizar colunas na ordem real (LEADS → ... → COMPARECEU E FECHOU) por `helena_steps.position`.
+  2. Card mostra nome, data, horário, etiquetas (unidade/CRC/IA) com cores da marca.
+  3. Header de coluna com contagem e soma de `closed_value`.
+  4. Filtro por etiqueta.
+- **Critérios de aceite:** funil completo com identidade Contact; contagem/soma corretas.
+- **Como testar:** abrir `/paineis` → 9 colunas com cards do espelho.
+- **DoD:** 9 colunas ordenadas · cards com etiquetas · tokens de marca.
+
+### STORY-4.2 — Mover cards e modal do card
+> Como **recepcionista**, quero **arrastar cards entre etapas e abrir o detalhe do card**, para **gerir o funil e registrar valor/notas**.
+> **RFs:** RF-022, RF-026. **Critérios:** drag move via engine ≤5s; mover para FECHOU pede valor; notas sincronizam.
+
+#### TASK-043: Drag-and-drop de cards via Card Sync Engine
+- **Story:** STORY-4.2 · **Requisito:** RF-022 · **Depende de:** TASK-042, TASK-022 · **Esforço:** M · **Senioridade:** pleno · **Status:** 🔲 todo
+- **Contexto:** RF-022 — arrastar entre colunas chama a engine (single writer, ADR 7); merge de tags/description.
+- **Arquivos:**
+  - `src/components/kanban/KanbanBoard.tsx` (alterar — DnD).
+  - `src/app/api/panels/cards/[id]/move/route.ts` (criar — POST move, chama `enqueueCardMove` com `origin='platform'`).
+- **Passo a passo:**
+  1. DnD entre colunas → POST move com `targetStepId`.
+  2. Mover para COMPARECEU E FECHOU → modal pede valor (grava no card).
+  3. Update otimista; em falha, badge "sync pendente".
+- **Critérios de aceite:** card movido reflete na Helena ≤5s; tags/description preservadas; valor persiste.
+- **Como testar:** arrastar card → etapa muda na Helena; para FECHOU → pede valor.
+- **DoD:** DnD via engine · captura de valor · otimista + badge.
+
+#### TASK-044: Modal do card (notas, valor, links para paciente/conversa)
+- **Story:** STORY-4.2 · **Requisito:** RF-026 · **Depende de:** TASK-042, TASK-010 · **Esforço:** M · **Senioridade:** pleno · **Status:** 🔲 todo
+- **Contexto:** Doc 2 §2.1 — modal do card com notas, valor, link p/ paciente e p/ conversa.
+- **Arquivos:**
+  - `src/components/kanban/CardModal.tsx` (criar).
+  - `src/app/api/panels/cards/[id]/notes/route.ts` (criar — GET/POST notas via `getCardNotes`/`createCardNote`).
+- **Passo a passo:**
+  1. Exibir dados do card, etiquetas, valor.
+  2. Listar/criar notas (sincroniza com Helena `/v1/panel-card/{id}/note`).
+  3. Link para Paciente 360° (TASK-051) e para conversa (`buildSessionUrl`).
+- **Critérios de aceite:** nota criada na plataforma aparece na Helena e vice-versa.
+- **Como testar:** criar nota → aparece na Helena.
+- **DoD:** notas bidirecionais · links funcionais.
+
+---
+
+## EPIC-05 — Paciente 360°
+
+**Objetivo:** ficha completa do paciente acessível de qualquer ponto (agenda, lista, card): dados, etapa no funil (com mover), histórico de consultas, vínculo Helena.
+**RFs:** RF-010..013.
+**DoD do épico:** 1 clique no paciente abre a ficha; histórico ordenado; etapa do funil visível e movível; vínculo Helena persistido.
+
+### STORY-5.1 — Vínculo paciente ↔ Helena
+> Como **sistema**, quero **resolver e persistir o contato/lead Helena do paciente por telefone**, para **a ficha mostrar o funil e o sync funcionar**.
+> **RFs:** RF-012. **Critérios:** vínculo persistido; telefone duplicado pede resolução manual.
+
+#### TASK-050: Resolução e persistência do vínculo Helena no Patient Service
+- **Story:** STORY-5.1 · **Requisito:** RF-012 · **Depende de:** TASK-005, TASK-010 · **Esforço:** M · **Senioridade:** pleno · **Status:** 🔲 todo
+- **Contexto:** Doc 2 §3 Patient Service — resolve por telefone E.164, persiste `helena_contact_id`/`helena_lead_id`.
+- **Arquivos:**
+  - `src/lib/patient/resolveHelena.ts` (criar).
+  - `src/app/api/patients/[id]/route.ts` (alterar — incluir resolução/persistência).
+- **Passo a passo:**
+  1. Normalizar telefone para E.164.
+  2. `getContactByPhone` → persistir `helena_contact_id`/`helena_lead_id`.
+  3. Múltiplos contatos → marcar para resolução manual (não persistir vínculo ambíguo).
+- **Critérios de aceite:** paciente agendado tem vínculo Helena persistido e visível.
+- **Como testar:** criar paciente com telefone existente na Helena → vínculo persiste.
+- **DoD:** E.164 · persistência · tratamento de duplicado.
+
+### STORY-5.2 — Ficha 360° (dados, histórico, funil)
+> Como **recepcionista/gestor**, quero **abrir a ficha completa do paciente com 1 clique**, para **ver histórico e etapa no funil e agir dali**.
+> **RFs:** RF-010, RF-011, RF-013. **Critérios:** clique abre ficha; histórico ordenado; mover etapa reflete no kanban/Helena.
+
+#### TASK-051: Drawer/página Paciente 360° (dados + histórico + funil)
+- **Story:** STORY-5.2 · **Requisito:** RF-010, RF-011, RF-013 · **Depende de:** TASK-050, TASK-041, TASK-022 · **Esforço:** G · **Senioridade:** pleno · **Status:** 🔲 todo
+- **Contexto:** Doc 2 §2.1 — drawer/página com dados, etapa atual (com mover), histórico timeline, vínculo Helena.
+- **Arquivos:**
+  - `src/components/patient/Patient360.tsx` (criar — drawer).
+  - `src/app/api/patients/[id]/timeline/route.ts` (criar — histórico de consultas).
+  - `src/components/agenda/AppointmentBlock.tsx` e `src/components/kanban/KanbanCard.tsx` (alterar — clique abre Patient360).
+- **Passo a passo:**
+  1. Agregar: cadastro local + histórico (timeline ordenada, última visita em destaque, inclui cancelamentos/faltas) + card atual do espelho + vínculo Helena.
+  2. Permitir mover a etapa dali (mesma engine — POST move da TASK-043).
+  3. Ligar clique no paciente (agenda/lista/card) ao drawer.
+  4. Aplicar identidade Contact.
+- **Critérios de aceite:** 1 clique abre ficha; mover etapa pela ficha reflete no kanban e Helena; histórico completo ordenado.
+- **Como testar:** clicar paciente na agenda → drawer com histórico + etapa; mover etapa → reflete no kanban.
+- **DoD:** clique em 3 origens · histórico ordenado · mover via engine.
+
+---
+
+## EPIC-06 — API Pública v1 documentada + RBAC
+
+**Objetivo:** consolidar RBAC (admin/CRC/dentista) no backend e expor/documentar (OpenAPI) a API pública v1 com API Key e escopos, migrando o n8n para consumi-la (ADR 7).
+**RFs:** RF-060, RF-070, RNF-012.
+**DoD do épico:** matriz de permissão aplicada no backend; API v1 documentada navegável; n8n move cards via API da plataforma.
+
+### STORY-6.1 — RBAC consolidado
+> Como **plataforma**, quero **perfis aplicados no backend (não só na UI)**, para **garantir que financeiro e configs sejam admin-only (RNF-012)**.
+> **RFs:** RF-070. **Critérios:** matriz aplicada via middleware; navegação reflete o papel.
+
+#### TASK-060: Aplicar `allowedRoles` nas rotas e matriz de navegação
+- **Story:** STORY-6.1 · **Requisito:** RF-070, RNF-012 · **Depende de:** nenhuma (paralelo) · **Esforço:** M · **Senioridade:** pleno · **Status:** 🔲 todo
+- **Contexto:** `withAuth(handler, allowedRoles?)` já suporta RBAC. Aplicar consistentemente: admin (config, integrações, financeiro futuro), CRC, dentista.
+- **Arquivos:**
+  - Rotas `src/app/api/admin/**` e `integrations/**` (alterar — `withAuth(h, ['admin'])`).
+  - `src/components/agenda/AgendaSidebar.tsx`/layout (alterar — esconder itens por papel).
+- **Passo a passo:**
+  1. Auditar rotas e aplicar `allowedRoles` corretos.
+  2. Refletir na navegação (esconder o que o papel não acessa).
+  3. Bloqueio no backend (403), não só UI.
+- **Critérios de aceite:** recepcionista recebe 403 em rotas admin; navegação coerente.
+- **Como testar:** login não-admin chama rota admin → 403.
+- **DoD:** RBAC no backend · navegação por papel.
+
+### STORY-6.2 — API Pública v1 + OpenAPI + migração n8n
+> Como **integrador (n8n)**, quero **uma API documentada com API Key e escopos**, para **consumir agenda e painéis sem chamar a Helena diretamente (ADR 7)**.
+> **RFs:** RF-060. **Critérios:** OpenAPI navegável; n8n move card via `/api/v1/panel-cards/move`.
+
+#### TASK-061: Camada `/api/v1/*` com API Key + escopos
+- **Story:** STORY-6.2 · **Requisito:** RF-060 · **Depende de:** TASK-060, TASK-022, TASK-023 · **Esforço:** G · **Senioridade:** sênior · **Status:** 🔲 todo
+- **Contexto:** Doc 2 §3 API Pública v1 — `/api/v1/*` (agenda, pacientes, painéis, métricas), API Key (`ai_api_keys` existente) com escopos.
+- **Arquivos:**
+  - `src/lib/apiKeyAuth.ts` (criar/estender `agentAuth.ts` — validar API Key bcrypt + escopos).
+  - `src/app/api/v1/panel-cards/move/route.ts` (criar — n8n move card via engine).
+  - `src/app/api/v1/appointments/route.ts`, `src/app/api/v1/patients/route.ts` (criar/expor).
+- **Passo a passo:**
+  1. Middleware de API Key com escopos por grupo (agenda/pacientes/painéis).
+  2. `panel-cards/move` chama `enqueueCardMove` (mesma engine — single writer).
+  3. Erros padronizados `{ code, message }` (Doc 2 §7).
+- **Critérios de aceite:** n8n consome com API Key; key sem escopo → 403; rate limit → 429.
+- **Como testar:** chamar `/api/v1/panel-cards/move` com key válida → card movido.
+- **DoD:** API Key + escopos · erros padronizados · engine reaproveitada.
+
+#### TASK-062: Documentação OpenAPI/Swagger publicada
+- **Story:** STORY-6.2 · **Requisito:** RF-060 · **Depende de:** TASK-061 · **Esforço:** M · **Senioridade:** pleno · **Status:** 🔲 todo
+- **Contexto:** RF-060 — documentação navegável; n8n consome usando só a doc.
+- **Arquivos:**
+  - `src/app/api/v1/openapi.json/route.ts` (criar — spec gerada).
+  - `src/app/[accountId]/api-docs/page.tsx` (criar — Swagger UI).
+- **Passo a passo:**
+  1. Gerar spec OpenAPI dos grupos agenda/pacientes/painéis/métricas/automations.
+  2. Publicar Swagger UI navegável.
+- **Critérios de aceite:** documentação navegável; descreve auth por API Key e escopos.
+- **Como testar:** abrir `/api-docs` → endpoints documentados.
+- **DoD:** spec gerada · UI publicada.
+
+#### TASK-063: Migrar workflow n8n para consumir a API da plataforma (ADR 7)
+- **Story:** STORY-6.2 · **Requisito:** RF-060, ADR 7 · **Depende de:** TASK-061, TASK-062 · **Esforço:** M · **Senioridade:** sênior/devops · **Status:** 🔲 todo
+- **Contexto:** ADR 7 — n8n deixa de chamar a Helena direto; passa a chamar a API da plataforma (single writer).
+- **Arquivos/locais:** workflow n8n (externo) + verificação dos endpoints `/api/v1/*`.
+- **Passo a passo:**
+  1. Substituir a chamada direta `PUT api.wts.chat/...` por `POST /api/v1/panel-cards/move`.
+  2. Usar API Key da plataforma (não o token Helena).
+  3. Validar que agendamento via IA cria card com etiqueta `AGENDADO IA` + descrição estruturada.
+- **Critérios de aceite:** n8n move cards só via plataforma; nenhuma escrita direta na Helena.
+- **Como testar:** simular agendamento IA → card movido via plataforma com etiqueta IA.
+- **DoD:** n8n migrado · token Helena removido do n8n (fecha o ciclo de TASK-001).
+
+---
+
+## 3. FASE 2 — STORIES (a detalhar no início da fase)
+
+> Quebrar em tasks no início da Fase 2, após validar RF-030..033 e RF-050..051 com a equipe.
+
+### EPIC-07 — Dashboard Gestão de Leads (RF-030..033)
+- **STORY-7.1** — Como gestor, quero KPIs do funil (leads, agendados, conversão por etapa, ticket médio, valor fechado) para medir a operação. *(RF-030)*
+- **STORY-7.2** — Como gestor, quero filtros combináveis (período/unidade/CRC/IA-humano) que recalculam em <2s para analisar recortes. *(RF-031, RNF-001 — Metrics Service sobre o espelho)*
+- **STORY-7.3** — Como gestor, quero gráficos elaborados (funil, série temporal, ranking CRC, IA×humano, por unidade) com drill-down. *(RF-032)*
+- **STORY-7.4** — Como qualquer perfil autenticado, quero acessar o dashboard de leads. *(RF-033)*
+- **Infra-chave a detalhar:** Metrics Service (views materializadas/RPC sobre `helena_cards` por etapa×período×etiqueta), hook `useMetrics`, tela `src/app/[accountId]/dashboards/leads/page.tsx`.
+
+### EPIC-08 — Lembrete D-1 + resposta do paciente (RF-050, 051)
+- **STORY-8.1** — Como sistema, quero enviar lembrete D-1 via template Helena (Automation Scheduler/cron) para consultas de amanhã. *(RF-050)*
+- **STORY-8.2** — Como paciente, quero confirmar/cancelar pelo WhatsApp e ver consulta e card atualizados automaticamente. *(RF-051 — via agente IA `/api/agent/*` + engine)*
+
+### EPIC-09 — Webhooks de saída da plataforma (RF-061)
+- **STORY-9.1** — Como integrador, quero assinar eventos da plataforma (consulta criada/cancelada, card movido, fechou) para automatizar sem polling. *(RF-061)*
+
+---
+
+## 4. FASE 3 — STORIES (a detalhar no início da fase)
+
+> Pré-requisito: **PoC Clinicorp** (Doc 2 §9.4) — confirmar payloads de `/financial/list_invoices` e `/estimates/list` antes de quebrar tasks.
+
+### EPIC-10 — Integração Clinicorp leitura (RF-040..042, RI-005/006)
+- **STORY-10.1** — Como admin, quero o pull diário + sob demanda do financeiro Clinicorp (snapshots locais) para alimentar dashboard e ficha. *(RF-040, RI-005)*
+- **STORY-10.2** — Como admin, quero detalhar formas de pagamento e entradas programadas. *(RF-041)*
+- **STORY-10.3** — Como admin, quero previsão de recebíveis (forecast estatístico). *(RF-042, IA-003)*
+
+### EPIC-11 — Dashboard Financeiro + cobrança WhatsApp (RF-043, 044)
+- **STORY-11.1** — Como admin, quero o dashboard financeiro (faturamento/fluxo/inadimplentes/forecast) com acesso restrito a admin (backend). *(RF-044, RNF-012)*
+- **STORY-11.2** — Como admin, quero botão "Cobrar via WhatsApp" na lista de inadimplentes com confirmação e log. *(RF-043)*
+
+### EPIC-12 — Financeiro na ficha do paciente (RF-014)
+- **STORY-12.1** — Como gestor, quero ver na ficha 360° o total gasto, valores em aberto, última visita e orçamentos do Clinicorp. *(RF-014)*
+
+---
+
+## 5. PAINEL DE CONTROLE — TODAS AS TASKS DA FASE 1
+
+| ID | Task | Épico | Requisito | Depende de | Esforço | Status |
+|---|---|---|---|---|---|---|
+| TASK-001 | Rotacionar token Helena + secret store | EPIC-00 | RNF-010 | — | P | 🔲 |
+| TASK-002 | Tabela `account_integrations` | EPIC-00 | RNF-010/011 | TASK-001 | M | 🔲 |
+| TASK-003 | Migration espelho Helena | EPIC-00 | RF-020/021/023 | TASK-002 | M | 🔲 |
+| TASK-004 | Migration outbox/webhooks/log | EPIC-00 | RNF-013/014 | TASK-003 | M | 🔲 |
+| TASK-005 | Alter `patients`/`appointments` | EPIC-00 | RF-012/006 | TASK-003 | P | 🔲 |
+| TASK-010 | Estender `helena.ts` (painel/card/tag) | EPIC-01 | RI-001/003 | TASK-002 | M | 🔲 |
+| TASK-011 | Config "Integração Helena" | EPIC-01 | RF-021 | TASK-010/002 | M | 🔲 |
+| TASK-012 | [Humano] Cadastrar tags na Helena | EPIC-01 | RF-025 | — | P | 🔲 |
+| TASK-013 | Tela vínculo de tags | EPIC-01 | RF-025 | TASK-012/011 | M | 🔲 |
+| TASK-014 | Panel Mirror — sync inicial | EPIC-01 | RF-020/021 | TASK-010/003/011 | G | 🔲 |
+| TASK-020 | Outbox Worker + retry | EPIC-02 | RNF-014/015 | TASK-004/010 | G | 🔲 |
+| TASK-021 | Fallback duplicate/delete+create | EPIC-02 | RF-022 (R1) | TASK-020 | M | 🔲 |
+| TASK-022 | Card Sync Engine outbound | EPIC-02 | RF-022/023 | TASK-020/014/013 | G | 🔲 |
+| TASK-023 | Domain events na agenda | EPIC-02 | RF-006/023 | TASK-022 | M | 🔲 |
+| TASK-026 | [PoC] Inventariar webhooks Helena | EPIC-02 | RF-024 (R2) | TASK-010 | P | 🔲 |
+| TASK-024 | Webhook Receiver (dedup) | EPIC-02 | RF-024/RNF-013 | TASK-026/004 | M | 🔲 |
+| TASK-025 | Aplicar inbound + anti-loop | EPIC-02 | RF-024 | TASK-024/022 | M | 🔲 |
+| TASK-030 | Durações dinâmicas (slots) | EPIC-03 | RF-004 | TASK-005 | M | 🔲 |
+| TASK-031 | SlotPicker visual | EPIC-03 | RF-001 | TASK-030 | M | 🔲 |
+| TASK-032 | Renderizar bloqueios no grid | EPIC-03 | RF-002 | — | M | 🔲 |
+| TASK-033 | Filtros unidade/procedimento | EPIC-03 | RF-003 | — | M | 🔲 |
+| TASK-034 | Conflito pré-confirmação | EPIC-03 | RF-005 | TASK-031 | M | 🔲 |
+| TASK-035 | Ações rápidas no popover | EPIC-03 | RF-006 | TASK-023 | M | 🔲 |
+| TASK-036 | Reagendamento DnD (Could) | EPIC-03 | RF-007 | TASK-035 | M | 🔲 |
+| TASK-040 | Tokens de marca `@theme` | EPIC-04 | RNF-022 | — | P | 🔲 |
+| TASK-041 | Hook `usePanelCards` + endpoint | EPIC-04 | RF-020/RNF-021 | TASK-014/003 | M | 🔲 |
+| TASK-042 | KanbanBoard (9 colunas) | EPIC-04 | RF-020/021 | TASK-040/041 | G | 🔲 |
+| TASK-043 | DnD de cards via engine | EPIC-04 | RF-022 | TASK-042/022 | M | 🔲 |
+| TASK-044 | Modal do card (notas/valor) | EPIC-04 | RF-026 | TASK-042/010 | M | 🔲 |
+| TASK-050 | Vínculo Helena no Patient Service | EPIC-05 | RF-012 | TASK-005/010 | M | 🔲 |
+| TASK-051 | Drawer Paciente 360° | EPIC-05 | RF-010/011/013 | TASK-050/041/022 | G | 🔲 |
+| TASK-060 | RBAC `allowedRoles` + navegação | EPIC-06 | RF-070/RNF-012 | — | M | 🔲 |
+| TASK-061 | API `/api/v1/*` + escopos | EPIC-06 | RF-060 | TASK-060/022/023 | G | 🔲 |
+| TASK-062 | OpenAPI/Swagger publicado | EPIC-06 | RF-060 | TASK-061 | M | 🔲 |
+| TASK-063 | Migrar n8n para API plataforma | EPIC-06 | RF-060/ADR7 | TASK-061/062 | M | 🔲 |
+
+### Caminho crítico (Fase 1)
+`TASK-001 → TASK-002 → TASK-003 → TASK-004 → TASK-010 → TASK-020 → TASK-022 → TASK-023 → (TASK-035 / TASK-043 / TASK-051) → TASK-061 → TASK-063`
+
+### Tasks paralelizáveis (não bloqueiam a equipe)
+- **Sem dependência (podem começar já):** TASK-001, TASK-012, TASK-032, TASK-033, TASK-040, TASK-060.
+- **PoC/risco (priorizar cedo):** TASK-026 (webhooks), validação do `moveCard` na TASK-010.
+
+---
+
+## 6. PRÓXIMOS 5 ITENS RECOMENDADOS PARA INICIAR
+1. **TASK-001** — Rotacionar token Helena (segurança #1, elimina risco ativo R4).
+2. **TASK-012** — Cadastrar tags na Helena (pré-requisito humano, paralelo, destrava EPIC-01 / R3).
+3. **TASK-002** — `account_integrations` (base de secrets multi-tenant).
+4. **TASK-003** — Migration do espelho Helena (destrava EPIC-01 e EPIC-02).
+5. **TASK-040 / TASK-032 / TASK-033** — Frentes visuais sem dependência (tokens de marca, bloqueios, filtros) para o frontend não ficar ocioso enquanto a fundação roda.

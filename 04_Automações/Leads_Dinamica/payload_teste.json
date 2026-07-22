@@ -1,0 +1,61 @@
+{
+  "responseKeys": [],
+  "companyId": "79a15d58-9d7b-4420-a75e-985267e9c8ed",
+  "sessionId": "11111111-1111-1111-1111-111111111111",
+  "callbackUrl": null,
+  "callbackId": null,
+  "session": {
+    "id": "11111111-1111-1111-1111-111111111111",
+    "createdAt": "2026-06-17T17:00:00.000000Z",
+    "departmentId": "a4e54eb7-098b-4db0-9b57-4f6615a3fcc0",
+    "userId": "00000000-0000-0000-0000-000000000000",
+    "number": "2026061700001",
+    "utm": {
+      "clid": null,
+      "source": "FACEBOOK",
+      "medium": "WHATSAPP BUSINESS APP",
+      "campaign": "TESTE AUTOMACAO",
+      "content": null,
+      "headline": "Campanha de teste — lead Facebook",
+      "term": null,
+      "referralUrl": "https://fb.me/teste",
+      "sourceId": "120236158707540067"
+    }
+  },
+  "channel": {
+    "id": "d8166648-9a1a-4587-bbfd-aa86d22a357d",
+    "key": "5511975544680",
+    "platform": "WhatsApp",
+    "displayName": "Instancia Teste"
+  },
+  "contact": {
+    "id": "291e91e7-1e5b-4cc7-94e0-daf6b00139cd",
+    "name": "Lead de Teste",
+    "first-name": "Lead",
+    "phonenumber": "+55|11999990000",
+    "display-phonenumber": "(11) 99999-0000",
+    "email": null,
+    "instagram": null,
+    "tags": null,
+    "annotation": null,
+    "metadata": {}
+  },
+  "questions": {},
+  "menus": {},
+  "templates": {},
+  "metadata": {},
+  "lastContactMessage": "Ola! Quero mais informacoes, por favor.",
+  "lastMessage": {
+    "id": "99999999-9999-9999-9999-999999999999",
+    "createdAt": "2026-06-17T17:00:03.000Z",
+    "type": "TEXT",
+    "text": "Ola! Quero mais informacoes, por favor.",
+    "fileId": null,
+    "file": null
+  },
+  "lastMessagesAggregated": {
+    "text": "Ola! Quero mais informacoes, por favor.",
+    "files": []
+  },
+  "senderId": null
+}

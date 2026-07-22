@@ -1,0 +1,15 @@
+CLÍNICA: Unno
+
+## Unidade Três Rios
+ENDEREÇO COMPLETO: [PREENCHER — endereço completo da unidade Três Rios]
+CIDADE/ESTADO: Três Rios - RJ
+REFERÊNCIA: [PREENCHER — ponto de referência]
+LINK DO GOOGLE MAPS: [PREENCHER — link do Maps]
+HORÁRIO: Segunda a sexta, das 09h às 18h. Não fecha para almoço. Sábado e domingo: fechado.
+
+## Unidade Juiz de Fora
+ENDEREÇO COMPLETO: [PREENCHER — endereço completo da unidade Juiz de Fora]
+CIDADE/ESTADO: Juiz de Fora - MG
+REFERÊNCIA: [PREENCHER — ponto de referência]
+LINK DO GOOGLE MAPS: [PREENCHER — link do Maps]
+HORÁRIO: Segunda a sexta, das 09h às 18h. Não fecha para almoço. Sábado e domingo: fechado.

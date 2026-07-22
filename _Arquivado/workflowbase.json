@@ -1,0 +1,268 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "SALUTAR-MOVIMENTARPAINEL",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -3616,
+        3264
+      ],
+      "id": "2247754b-14ec-41a3-82d1-de709eeb27ad",
+      "name": "Webhook Agendamento IA",
+      "webhookId": "dc585fe6-ccd4-4531-beec-7d1a07359c3a"
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json.body ?? $input.first().json;\n\nconst contactId   = payload.contact?.id;\nconst nomeCliente = payload.contact?.name ?? 'Sem nome';\nconst telefone    = payload.contact?.phonenumber ?? '';\nconst sessionId   = payload.sessionId ?? payload.session?.id;\n\nif (!contactId) throw new Error('contactId não encontrado no payload');\n\nconst annotation = (payload.contact?.annotation ?? '').replace(/\\\\n/g, '\\n');\n\nconst extrairLinha = (rotulo) => {\n  const regex = new RegExp(`^\\\\d+\\.\\\\s*${rotulo}:\\\\s*(.+)$`, 'im');\n  const match = annotation.match(regex);\n  return match ? match[1].trim() : 'Não informado';\n};\n\nconst statusAtual   = extrairLinha('Status Atual');\nconst estagioParado = extrairLinha('Estágio Parado');\nconst dorPrincipal  = extrairLinha('Dor Principal');\nconst resumoRapido  = extrairLinha('Resumo Rápido');\nconst instrucao     = extrairLinha('Instrução para o Futuro');\n\nlet agendamento = 'Não informado';\nconst matchData = resumoRapido.match(\n  /(\\d{1,2}\\/\\d{1,2}(?:\\/\\d{2,4})?)\\s+às\\s+(\\d{1,2}[h:]\\d{0,2})/i\n);\nif (matchData) {\n  const hora = matchData[2].replace('h', 'h').padEnd(5, '00');\n  agendamento = `${matchData[1]} às ${hora}`;\n}\n\nconst agora = new Date();\nconst dataMovimento = agora.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });\nconst horaMovimento = agora.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });\n\nreturn [{\n  json: {\n    contactId,\n    nomeCliente,\n    telefone,\n    sessionId,\n    statusAtual,\n    estagioParado,\n    dorPrincipal,\n    resumoRapido,\n    instrucao,\n    agendamento,\n    dataMovimento,\n    horaMovimento\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3360,
+        3264
+      ],
+      "id": "51129f11-7092-4c5f-86b5-d4c397b9c477",
+      "name": "Extrair Dados do Payload1"
+    },
+    {
+      "parameters": {
+        "url": "https://api.wts.chat/crm/v1/panel/card",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "PanelId",
+              "value": "09e6e9bb-24b4-46d1-b8e4-0c4559423edc"
+            },
+            {
+              "name": "ContactId",
+              "value": "={{ $json.contactId }}"
+            },
+            {
+              "name": "PageSize",
+              "value": "1"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer pn_cSuM70gb7bL7KMHvnGOJvdoDTdOCEDjxnm2G9lDoAI"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -3136,
+        3264
+      ],
+      "id": "85f5da87-53d7-49d6-9803-4ff6cddda70b",
+      "name": "Buscar Card do Contato1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const resposta = $input.first().json;\nconst items = resposta.items ?? [];\n\nif (items.length === 0) throw new Error('Nenhum card encontrado para esse contato no painel');\n\nconst card = items[0];\nconst cardId = card.id;\n\n// Tags que já existem no card — preserva todas\nconst tagsExistentes = card.tagIds ?? [];\n\n// Tag nova a adicionar (etiqueta do painel CRM)\nconst TAG_NOVA = '49db1722-82f2-489b-9298-6a027af7fdc2';\n\n// Merge: mantém as existentes + adiciona a nova sem duplicar\nconst tagsFinal = [...new Set([...tagsExistentes, TAG_NOVA])];\n\nconst d = $('Extrair Dados do Payload1').first().json;\n\nconst descricao = [\n  `📅 CONSULTA AGENDADA`,\n  `Data/Hora: ${d.agendamento}`,\n  ``,\n  `👤 LEAD`,\n  `Nome: ${d.nomeCliente}`,\n  `Telefone: ${d.telefone}`,\n  ``,\n  `📋 RESUMO DA CONVERSA`,\n  d.resumoRapido,\n  ``,\n  `🎯 STATUS & ESTÁGIO`,\n  `Status: ${d.statusAtual}`,\n  `Estágio parado: ${d.estagioParado}`,\n  ``,\n  `🦷 DOR PRINCIPAL`,\n  d.dorPrincipal,\n  ``,\n  `🔜 INSTRUÇÃO PARA O FUTURO`,\n  d.instrucao,\n  ``,\n  `─────────────────────────`,\n  `✅ Movimentado pela IA em ${d.dataMovimento} às ${d.horaMovimento}`\n].join('\\n');\n\nconst requestBody = {\n  fields: ['StepId', 'Description', 'TagIds'],\n  stepId: '8f9dc89b-dfdf-45de-92c3-9b875abc5178',\n  description: descricao,\n  tagIds: tagsFinal\n};\n\nreturn [{ json: { cardId, requestBody, contactId: d.contactId } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2912,
+        3264
+      ],
+      "id": "747aa542-f1b4-4227-a4d5-13b54729e100",
+      "name": "Extrair cardId e Montar Body1"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ 'https://api.wts.chat/crm/v2/panel/card/' + $json.cardId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer pn_cSuM70gb7bL7KMHvnGOJvdoDTdOCEDjxnm2G9lDoAI"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -2720,
+        3264
+      ],
+      "id": "50f47f77-d262-47ae-89fb-3bfcec596aa3",
+      "name": "Mover Card para Agendados pela IA1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -2512,
+        3264
+      ],
+      "id": "0882ba54-4be3-473e-b140-44e2da9364f2",
+      "name": "Respond to Webhook2"
+    }
+  ],
+  "connections": {
+    "Webhook Agendamento IA": {
+      "main": [
+        [
+          {
+            "node": "Extrair Dados do Payload1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair Dados do Payload1": {
+      "main": [
+        [
+          {
+            "node": "Buscar Card do Contato1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Card do Contato1": {
+      "main": [
+        [
+          {
+            "node": "Extrair cardId e Montar Body1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair cardId e Montar Body1": {
+      "main": [
+        [
+          {
+            "node": "Mover Card para Agendados pela IA1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mover Card para Agendados pela IA1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "Webhook Agendamento IA": [
+      {
+        "headers": {
+          "host": "webhook.dentistapower.com.br",
+          "content-length": "1596",
+          "content-type": "application/json; charset=utf-8",
+          "correlation-context": "h.tenantId=c776fb5e-f3fc-4fc5-8ec4-af2fa9a73092, h.userId=7e5e9c2b-eaf5-4852-8d95-0eada1255652, h.host=frontcrm.wts.chat, h.partnerId=f4da2d2e-0ef8-4c29-8640-361bbad36a59",
+          "traceparent": "00-fb351f3687a619c9903418868fed6f61-0c1dd8d64ada054f-01",
+          "x-forwarded-for": "18.215.79.89",
+          "x-forwarded-host": "webhook.dentistapower.com.br",
+          "x-forwarded-port": "443",
+          "x-forwarded-proto": "https",
+          "x-forwarded-server": "7b7aec13661d",
+          "x-real-ip": "18.215.79.89",
+          "accept-encoding": "gzip"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "responseKeys": [],
+          "companyId": "517a2e61-5e91-485a-bfc5-fa96f4a8e526",
+          "sessionId": "b1db1336-6b98-4a8b-80ff-24ef57208ae3",
+          "session": {
+            "id": "b1db1336-6b98-4a8b-80ff-24ef57208ae3",
+            "createdAt": "2026-06-10T17:35:45.214343Z",
+            "departmentId": "2611bea9-5d62-4790-a1b6-7e815b6ecdd4",
+            "userId": "00000000-0000-0000-0000-000000000000",
+            "number": "2026061000033",
+            "utm": null
+          },
+          "channel": {
+            "id": "ed6c87d5-54df-4de5-b384-38dc79187efc",
+            "key": "553821000925",
+            "platform": "WhatsApp",
+            "displayName": "Instância 6e228c"
+          },
+          "contact": {
+            "id": "c8883c29-5d37-4a73-a920-2d82d6cad995",
+            "name": "Andre Pujol",
+            "first-name": "Andre",
+            "phonenumber": "+55|61995547251",
+            "display-phonenumber": "(61) 99554-7251",
+            "email": "",
+            "instagram": null,
+            "tags": [
+              "Agendamento via IA",
+              "ORGÂNICO"
+            ],
+            "annotation": "1. Status Atual: Agendado\n2. Estágio Parado: E8 - Finalização\n3. Dor Principal: Ainda não identificada\n4. Resumo Rápido: Andre Luiz Pujol agendou avaliação para 11/06 às 10h, ainda sem detalhar o motivo do contato.\n5. Instrução para o Futuro: Se retornar, explorar motivo do contato e contexto da dor.\n6. Autocrítica: Atendi prontamente o pedido de agendamento, mas faltou aprofundar no motivo. Em próximos contatos, aprofundar mais.",
+            "metadata": {}
+          },
+          "questions": {},
+          "menus": {},
+          "templates": {},
+          "metadata": {},
+          "lastContactMessage": "ok obrigado",
+          "lastMessage": {
+            "id": "212ea920-635c-4fe7-a1fd-1b889efdc7c3",
+            "createdAt": "2026-06-10T17:41:51.232Z",
+            "type": "TEXT",
+            "text": "ok obrigado",
+            "fileId": null,
+            "file": null
+          },
+          "lastMessagesAggregated": {
+            "text": "ok obrigado",
+            "files": []
+          },
+          "senderId": null
+        },
+        "webhookUrl": "https://webhook.dentistapower.com.br/webhook/SALUTAR-MOVIMENTARPAINEL",
+        "executionMode": "production"
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d1a2ea4f12ae9ebd3132590ec74e61784d3b49e17967bcb70d511f83551a7c49"
+  }
+}

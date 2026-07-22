@@ -1,0 +1,21 @@
+# BANCO DE CONHECIMENTO — LOCALIZAÇÃO
+## Prime Odontocenter
+
+---
+
+| Campo | Informação |
+|---|---|
+| **Clínica** | Prime Odontocenter |
+| **Endereço** | Avenida Jornalista Umberto Calderaro, 7 - Adrianópolis (antiga Paraíba) — Manaus/AM |
+| **Referência** | Lado esquerdo da via, entre a Distribuidora Brasil e a Clínica PRAX |
+| **Link Google Maps** | https://maps.app.goo.gl/pCbt37oJuhXL99RS9 |
+
+---
+
+### Instruções de Uso:
+
+Quando o paciente solicitar a localização da clínica, envie o **Endereço** em texto, a **Referência** e o **Link Google Maps**.
+
+> "Estamos na Avenida Jornalista Umberto Calderaro, 7 - Adrianópolis (antiga Paraíba), aqui em Manaus 📍"
+> "Fica do lado esquerdo da via, entre a Distribuidora Brasil e a Clínica PRAX."
+> "Aqui está nossa localização no mapa: https://maps.app.goo.gl/pCbt37oJuhXL99RS9"

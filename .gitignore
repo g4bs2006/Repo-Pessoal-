@@ -1,0 +1,28 @@
+# Dependências e builds
+node_modules/
+dist/
+build/
+.next/
+*.tsbuildinfo
+
+# Credenciais — NUNCA versionar
+.env
+.env.local
+.env.development
+.env.production
+*.pem
+*.key
+
+# Ferramentas locais
+.claude/
+.obsidian/
+.aiox-core/
+
+# Arquivos grandes (limite do GitHub: 100MB)
+*.zip
+
+# Logs e temporários
+*.log
+*.tmp
+Thumbs.db
+.DS_Store

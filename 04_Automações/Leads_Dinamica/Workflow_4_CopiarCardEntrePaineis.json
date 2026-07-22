@@ -1,0 +1,266 @@
+{
+  "name": "Helena - Copiar Card Entre Painéis (PANEL_CARD_NEW)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "copiar-card-painel",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-2400, 400],
+      "id": "wf4-webhook",
+      "name": "Card Movido (Origem)",
+      "webhookId": "copiar-card-painel"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Payload real do PANEL_CARD_NEW: tudo em body.content.\nconst b = $input.first().json.body ?? $input.first().json;\nconst c = b.content ?? {};\nconst cardId    = c.id       ?? null;\nconst panelId   = c.panelId  ?? null;\nconst stepId    = c.stepId   ?? null;\nconst title     = c.title    ?? null;\nconst description = c.description ?? null;\nconst contacts  = Array.isArray(c.contacts) ? c.contacts : [];\nconst contactId = contacts.length ? contacts[0].id : null;\nreturn [{ json: { cardId, panelId, stepId, title, description, contactId } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-2180, 400],
+      "id": "wf4-extrair",
+      "name": "Extrair Evento"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "c-panel",
+              "leftValue": "={{ $json.panelId }}",
+              "rightValue": "3b98f0bf-fea4-47b7-a922-2f3981220722",
+              "operator": { "type": "string", "operation": "equals" }
+            },
+            {
+              "id": "c-step",
+              "leftValue": "={{ $json.stepId }}",
+              "rightValue": "6f418246-8f5a-4c7e-a63b-31e177deed25",
+              "operator": { "type": "string", "operation": "equals" }
+            },
+            {
+              "id": "c-contact",
+              "leftValue": "={{ $json.contactId }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "isNotEmpty" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-1960, 400],
+      "id": "wf4-filtro",
+      "name": "É o painel+etapa certo?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"status\": \"ignorado\" }",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [-1960, 620],
+      "id": "wf4-ignorado",
+      "name": "Ignorado"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.wts.chat/crm/v1/panel/card/{{ $('Extrair Evento').first().json.cardId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer pn_7PEG91xSt3kCPnqplUOu52ww9nDjNAlr5lbuUkYdI" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-1720, 320],
+      "id": "wf4-get-card",
+      "name": "Get Card Origem",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.wts.chat/crm/v1/panel/3b98f0bf-fea4-47b7-a922-2f3981220722?IncludeDetails=Tags",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer pn_7PEG91xSt3kCPnqplUOu52ww9nDjNAlr5lbuUkYdI" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-1500, 320],
+      "id": "wf4-tags-origem",
+      "name": "Tags Painel Origem",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.wts.chat/crm/v1/panel/f33dce4a-3655-49ee-aa2d-1b852aa34923?IncludeDetails=Tags",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer pn_7PEG91xSt3kCPnqplUOu52ww9nDjNAlr5lbuUkYdI" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-1280, 320],
+      "id": "wf4-tags-destino",
+      "name": "Tags Painel Destino",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.wts.chat/crm/v1/panel/card?PanelId=f33dce4a-3655-49ee-aa2d-1b852aa34923&ContactId={{ $('Extrair Evento').first().json.contactId }}&IncludeArchived=false&OrderBy=CreatedAt&OrderDirection=DESCENDING&PageSize=5",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer pn_7PEG91xSt3kCPnqplUOu52ww9nDjNAlr5lbuUkYdI" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-1060, 320],
+      "id": "wf4-cards-destino",
+      "name": "Cards no Painel Destino",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const norm = (s) => (s || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().trim();\n\n// Card origem (dados completos)\nconst originCard = $('Get Card Origem').first().json || {};\nconst tagIds = Array.isArray(originCard.tagIds) ? originCard.tagIds : [];\nconst contactIds = Array.isArray(originCard.contactIds) ? originCard.contactIds : [];\nconst title = originCard.title ?? $('Extrair Evento').first().json.title ?? 'Lead';\nconst description = originCard.description ?? $('Extrair Evento').first().json.description ?? '';\n\n// Mapas de tags por nome\nconst origemTags = (($('Tags Painel Origem').first().json) || {}).tags || [];\nconst idToName = {}; origemTags.forEach(t => { idToName[t.id] = t.name; });\nconst destinoTags = (($('Tags Painel Destino').first().json) || {}).tags || [];\nconst nameToId = {}; destinoTags.forEach(t => { nameToId[norm(t.name)] = t.id; });\n\n// Mapeia tagIds do painel origem para painel destino (por nome)\nconst mappedTagIds = [];\nfor (const tid of tagIds) {\n  const nome = norm(idToName[tid] || '');\n  const destId = nome ? nameToId[nome] : null;\n  if (destId && !mappedTagIds.includes(destId)) mappedTagIds.push(destId);\n}\n\n// Verifica card existente no destino\nconst resp = $('Cards no Painel Destino').first().json;\nconst arr = Array.isArray(resp) ? resp : (resp.items ?? resp.data ?? resp.cards ?? []);\nconst existingCard = Array.isArray(arr) && arr.length ? arr[0] : null;\nconst hasCard = !!existingCard;\nconst existingCardId = hasCard ? (existingCard.id ?? null) : null;\nconst existingTagIds = hasCard && Array.isArray(existingCard.tagIds) ? existingCard.tagIds : [];\nconst existingDesc = hasCard ? (existingCard.description || '') : '';\n\n// Merge de tags (existentes + mapeadas) e descrição\nconst mergedTagIds = Array.from(new Set([...existingTagIds, ...mappedTagIds]));\nlet mergedDesc = description || '';\nif (existingDesc && description && !existingDesc.includes(description)) {\n  mergedDesc = existingDesc + '\\n\\n---\\n' + description;\n} else if (existingDesc && !description) {\n  mergedDesc = existingDesc;\n}\n\nreturn [{ json: {\n  hasCard, existingCardId,\n  title, description, mergedDesc,\n  mappedTagIds, mergedTagIds,\n  contactIds,\n  contactId: $('Extrair Evento').first().json.contactId\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-840, 320],
+      "id": "wf4-preparar",
+      "name": "Preparar Dados"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "c-hascard",
+              "leftValue": "={{ $json.hasCard }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-620, 320],
+      "id": "wf4-if-existe",
+      "name": "Card já existe no destino?"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.wts.chat/crm/v2/panel/card/{{ $('Preparar Dados').first().json.existingCardId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer pn_7PEG91xSt3kCPnqplUOu52ww9nDjNAlr5lbuUkYdI" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"fields\": [\"stepId\", \"tagIds\", \"description\"],\n  \"stepId\": \"45d2b1e2-e9f6-445f-bf06-33a80e38826c\",\n  \"tagIds\": {{ JSON.stringify($('Preparar Dados').first().json.mergedTagIds) }},\n  \"description\": {{ JSON.stringify($('Preparar Dados').first().json.mergedDesc) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-400, 200],
+      "id": "wf4-atualizar",
+      "name": "Atualizar Card Existente",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.wts.chat/crm/v1/panel/card",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer pn_7PEG91xSt3kCPnqplUOu52ww9nDjNAlr5lbuUkYdI" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"stepId\": \"45d2b1e2-e9f6-445f-bf06-33a80e38826c\",\n  \"title\": {{ JSON.stringify($('Preparar Dados').first().json.title) }},\n  \"description\": {{ JSON.stringify($('Preparar Dados').first().json.description) }},\n  \"contactIds\": [\"{{ $('Preparar Dados').first().json.contactId }}\"],\n  \"tagIds\": {{ JSON.stringify($('Preparar Dados').first().json.mappedTagIds) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-400, 460],
+      "id": "wf4-criar",
+      "name": "Criar Card no Destino",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"{{ $('Preparar Dados').first().json.hasCard ? 'atualizado' : 'criado' }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [-160, 320],
+      "id": "wf4-respond-ok",
+      "name": "Responder OK"
+    }
+  ],
+  "connections": {
+    "Card Movido (Origem)": { "main": [[{ "node": "Extrair Evento", "type": "main", "index": 0 }]] },
+    "Extrair Evento": { "main": [[{ "node": "É o painel+etapa certo?", "type": "main", "index": 0 }]] },
+    "É o painel+etapa certo?": {
+      "main": [
+        [{ "node": "Get Card Origem", "type": "main", "index": 0 }],
+        [{ "node": "Ignorado", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Card Origem": { "main": [[{ "node": "Tags Painel Origem", "type": "main", "index": 0 }]] },
+    "Tags Painel Origem": { "main": [[{ "node": "Tags Painel Destino", "type": "main", "index": 0 }]] },
+    "Tags Painel Destino": { "main": [[{ "node": "Cards no Painel Destino", "type": "main", "index": 0 }]] },
+    "Cards no Painel Destino": { "main": [[{ "node": "Preparar Dados", "type": "main", "index": 0 }]] },
+    "Preparar Dados": { "main": [[{ "node": "Card já existe no destino?", "type": "main", "index": 0 }]] },
+    "Card já existe no destino?": {
+      "main": [
+        [{ "node": "Atualizar Card Existente", "type": "main", "index": 0 }],
+        [{ "node": "Criar Card no Destino", "type": "main", "index": 0 }]
+      ]
+    },
+    "Atualizar Card Existente": { "main": [[{ "node": "Responder OK", "type": "main", "index": 0 }]] },
+    "Criar Card no Destino": { "main": [[{ "node": "Responder OK", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

@@ -1,0 +1,405 @@
+# REQUISITOS DO SISTEMA — Plataforma Contact (Escala Agenda 2.0)
+
+> **Versão:** 1.0 · **Data:** 12/06/2026 · **Autor:** Análise de Requisitos (descoberta conduzida com André Pujol)
+> **Base:** Projeto existente `Agenda---Contact-` (Next.js 16 + Supabase) + APIs Helena (white label) + API Clinicorp
+
+---
+
+## 1. VISÃO GERAL DO PROJETO
+
+### 1.1 Nome do Projeto
+**Plataforma Contact** — evolução do Escala Agenda para uma plataforma completa de gestão de jornada do paciente para clínicas odontológicas.
+
+### 1.2 Objetivo Geral
+
+**Problema:** hoje a operação está fragmentada em três sistemas: a agenda própria (Escala Agenda), os painéis kanban da Helena (cuja interface não atende à identidade visual desejada) e o financeiro no Clinicorp. A movimentação do lead entre etapas é manual/via n8n (deleta card antigo e cria novo, ou atualiza StepId), não há dashboards consolidados de gestão de leads e não há visão financeira integrada.
+
+**Solução:** uma plataforma única, dinâmica e responsiva onde agenda, paciente, painéis e financeiro **conversam entre si**:
+- A agenda é a **fonte da verdade dos agendamentos** (não espelha o Clinicorp).
+- Cada ação na agenda (agendou, cancelou, reagendou, compareceu, faltou, fechou) **move automaticamente o card** no painel Helena correspondente.
+- Os painéis ganham um **frontend próprio (kanban)** com a identidade visual da Contact, usando a Helena apenas como backend/estrutura de dados.
+- O clique em um paciente na agenda abre a **visão 360°**: dados, histórico de agendamentos, etapa atual no funil e resumo financeiro.
+- Os painéis alimentam o **Dashboard de Gestão de Leads**; a integração Clinicorp alimenta o **Dashboard Financeiro** (restrito a admin).
+- O sistema expõe **APIs externas documentadas** (agenda, paciente, painéis, financeiro, automações) para consumo do agente de IA (n8n) e integrações futuras.
+
+**Resultado esperado:** clínicas operando 100% dentro da plataforma Contact (estratégia de trazer os clientes do Clinicorp para a plataforma), com métricas de funil em tempo real e previsibilidade financeira — incluindo visão futura de evolução para fintech (integração Asaas via Helena).
+
+### 1.3 Stakeholders e Personas (resumo — detalhe na seção de jornadas)
+
+| Persona | Papel | Uso principal |
+|---|---|---|
+| **CRC / Recepcionista** (ex.: Flávia) | Operação diária | Agenda, confirmações, movimentação de cards, WhatsApp |
+| **Gestor / Admin da clínica** | Gestão | Dashboards (leads + financeiro), configurações, cobrança |
+| **Agente de IA (n8n + Helena)** | Automação | Agendar/cancelar/remarcar via WhatsApp, mover cards, lembretes |
+| **Paciente / Lead** | Cliente final | Interage só via WhatsApp (confirma, cancela, recebe lembretes) |
+
+### 1.4 Plataforma de Desenvolvimento (stack confirmada)
+
+| Camada | Tecnologia | Observação |
+|---|---|---|
+| Frontend | Next.js 16.2.6 + React 19 + TypeScript 5 + Tailwind CSS 4 + Radix UI | Stack já existente no projeto |
+| Gráficos | Recharts `[PREMISSA — biblioteca leve e padrão no ecossistema React; sujeito à validação no design]` | Para os dashboards |
+| Backend | Next.js API Routes (REST) + Supabase (PostgreSQL 17, RLS, RPC) | 38 rotas já existentes |
+| Realtime | Supabase Realtime | Para "tudo conversando entre si" na UI |
+| Auth | JWT dual (humano 15min / IA 60min) + API Keys bcrypt | Já implementado |
+| Integrações | Helena (api.wts.chat, Bearer token) · Clinicorp (api.clinicorp.com, Basic auth) · n8n | |
+| Deploy | Vercel + Supabase (sa-east-1) | Já existente |
+
+---
+
+## 2. ESCOPO DO PROJETO
+
+### 2.1 Dentro do escopo
+
+**Fase 1 — Agenda dinâmica + Painéis (prioridade confirmada na descoberta):**
+1. Correções e melhorias da agenda: seletor visual de horários, exibição de bloqueios no grid, filtros por unidade/procedimento, durações dinâmicas, validação de conflito pré-confirmação, ações rápidas de status.
+2. Frontend próprio de painéis (kanban) com identidade visual Contact, usando Helena como backend.
+3. Sincronização bidirecional agenda ↔ painéis (status da consulta ↔ etapa do card), via API + webhooks Helena.
+4. Etiquetas e campos do card: nome do lead, data, horário, unidade, CRC responsável, origem (IA ou humano).
+5. Visão 360° do paciente (dados, histórico, etapa no funil, vínculo Helena).
+6. APIs externas documentadas (agenda, paciente, painéis) para n8n e integrações.
+
+**Fase 2 — Dashboards:**
+7. Dashboard Gestão de Leads (todos os perfis): KPIs do funil, filtros por período (dia/semana/mês/calendário custom), unidade, CRC, IA/humano; gráficos visuais elaborados; ticket médio e valor fechado.
+8. Lembrete/confirmação de consulta via WhatsApp (D-1) com atualização automática de status.
+
+**Fase 3 — Financeiro (última fase de implementação, confirmado na descoberta):**
+9. Integração Clinicorp (leitura): faturamento, entradas, saídas, fluxo de caixa, valores em aberto, inadimplentes, formas de pagamento, orçamentos.
+10. Dashboard Financeiro (somente admin): KPIs financeiros + previsão de recebíveis dos próximos meses (parcelas/entradas programadas).
+11. Botão de cobrança via WhatsApp (Helena) a partir do inadimplente.
+12. Resumo financeiro na ficha do paciente (total gasto, última visita, valores em aberto).
+
+### 2.2 Fora do escopo (nesta versão)
+
+- **Escrita no Clinicorp como espelho da agenda** — a agenda é própria; o Clinicorp é somente leitura financeira. Exceção: o botão já existente que cria agendamento no Clinicorp e replica na nossa agenda permanece como está.
+- Funcionalidades de **fintech** (emissão de cobranças, split, antecipação via Asaas) — registrada como visão futura, não implementada nesta versão.
+- Prontuário eletrônico / ficha clínica odontológica completa.
+- Aplicativo mobile nativo (a plataforma é web responsiva).
+- Agendamento online público (página self-service para paciente).
+- Criação/edição da **estrutura** de painéis e etapas dentro da nossa UI (etapas são gerenciadas na Helena; nossa UI as consome) `[PREMISSA — reduz escopo da Fase 1; a estrutura padrão de 9 etapas é criada uma vez na Helena por clínica]`.
+
+---
+
+## 3. REQUISITOS FUNCIONAIS
+
+> Prioridade MoSCoW. **Origem:** resposta da descoberta (D1–D7 = respostas às perguntas 1–7) ou `[PREMISSA]`.
+
+### 3.1 Agenda — Correções e Melhorias
+
+**RF-001 — Seletor visual de horários no agendamento** · **Must**
+- **Descrição:** substituir o campo de texto HH:mm do modal de agendamento por uma grade visual de slots disponíveis (consumindo a RPC `get_available_slots` já existente), exibindo horários livres por dentista/cadeira na data escolhida.
+- **Inputs:** dentista, unidade, procedimento, data. **Outputs:** grade de slots clicáveis com cadeira sugerida. **Validações:** slot deve respeitar `dentist_schedules`, `schedule_blocks` e conflitos.
+- **Critério de aceite:** usuário agenda uma consulta sem digitar horário manualmente; slots ocupados/bloqueados não aparecem como disponíveis.
+- **Origem:** descoberta ("erros da agenda: horários") + análise do código.
+
+**RF-002 — Exibição de bloqueios no grid da agenda** · **Must**
+- **Descrição:** renderizar `schedule_blocks` (almoço, ausência, reunião, reservado) como blocos visuais diferenciados nas visões diária e semanal, e sombrear horários fora do expediente do dentista.
+- **Critério de aceite:** um bloqueio de almoço 12h–13h aparece visualmente na coluna do dentista; não é possível agendar sobre ele pela UI.
+- **Origem:** descoberta + análise do código (`schedule_blocks` existe no banco, mas não é renderizado).
+
+**RF-003 — Filtros por unidade e por procedimento** · **Must**
+- **Descrição:** adicionar à agenda filtros de unidade (multi-clínica, ex.: IBS Eldorado) e de procedimento, combináveis com os filtros existentes (dentista, status, busca).
+- **Critério de aceite:** ao filtrar por unidade, somente consultas e dentistas daquela unidade aparecem; filtros persistem ao navegar entre datas.
+- **Origem:** descoberta ("fazer filtros", "dias").
+
+**RF-004 — Durações dinâmicas de slot** · **Must**
+- **Descrição:** eliminar o hardcode de 30min; a grade e a RPC devem respeitar a duração do procedimento (com override manual opcional no agendamento).
+- **Critério de aceite:** procedimento de 90min ocupa 3 slots visuais e bloqueia o intervalo completo.
+- **Origem:** análise do código + descoberta ("questão dos horários").
+
+**RF-005 — Validação de conflito pré-confirmação** · **Must**
+- **Descrição:** antes de confirmar, o modal consulta `check-conflicts` e exibe aviso visual de sobreposição (dentista, cadeira ou paciente), impedindo o submit cego.
+- **Critério de aceite:** tentativa de agendar em horário ocupado mostra aviso antes do submit, com sugestão do próximo slot livre.
+- **Origem:** análise do código (verificação só ocorria no submit).
+
+**RF-006 — Ações rápidas de status com sincronização de painel** · **Must**
+- **Descrição:** no popover da consulta, ações de 1 clique: Confirmar, Compareceu, Faltou, Cancelar, Reagendar, Fechou (com captura de valor). Cada ação atualiza o status local **e dispara a movimentação do card** no painel Helena (ver RF-023).
+- **Inputs:** id da consulta, ação, (valor R$ quando "Fechou"). **Outputs:** status atualizado + card movido + UI atualizada em tempo real.
+- **Critério de aceite:** clicar "Cancelar" na agenda move o card de AGENDADOS para CANCELADOS na Helena em até 5s, sem ação manual.
+- **Origem:** D4 ("tem que se correlacionar") + descrição inicial.
+
+**RF-007 — Reagendamento por drag-and-drop no grid** · **Could**
+- **Descrição:** arrastar um bloco de consulta para outro horário/dentista realiza o reagendamento (com validação de conflito), movendo o card para REAGENDADOS.
+- **Critério de aceite:** drop em horário válido reagenda; drop inválido reverte com aviso.
+- **Origem:** `[PREMISSA — melhoria natural de usabilidade da agenda; baixa prioridade]`.
+
+### 3.2 Paciente 360°
+
+**RF-010 — Ficha do paciente a partir da agenda** · **Must**
+- **Descrição:** clicar no paciente em qualquer ponto (agenda, lista, card do painel) abre a ficha 360°: dados cadastrais, etapa atual no funil, histórico e (Fase 3) resumo financeiro.
+- **Critério de aceite:** do bloco "André agendado" na agenda, 1 clique abre a ficha completa do André.
+- **Origem:** descrição inicial ("se eu clicar nesse paciente eu vejo o histórico...").
+
+**RF-011 — Histórico de agendamentos do paciente** · **Must**
+- **Descrição:** linha do tempo de todas as consultas (data, procedimento, dentista, unidade, status final) com última visita em destaque.
+- **Critério de aceite:** histórico completo ordenado, incluindo cancelamentos e faltas.
+- **Origem:** descrição inicial.
+
+**RF-012 — Vínculo paciente ↔ contato/lead Helena** · **Must**
+- **Descrição:** cada paciente armazena `helena_contact_id` e `helena_lead_id` (IDs gerados pela Helena para atendimento e lead, conforme D2). Resolução inicial por telefone (`GET /v1/contact/phonenumber/{phone}`), com persistência do vínculo. A Helena é a referência de identidade do lead; o Clinicorp usa nome+telefone para o ID próprio (usado apenas na Fase 3, leitura financeira).
+- **Validações:** telefone normalizado (E.164); em caso de múltiplos contatos para o mesmo telefone, exigir resolução manual na UI.
+- **Critério de aceite:** paciente criado/agendado pela plataforma tem vínculo Helena persistido e visível na ficha.
+- **Origem:** D2.
+
+**RF-013 — Etapa do funil na ficha do paciente** · **Must**
+- **Descrição:** a ficha exibe o card atual do paciente (painel, etapa, etiquetas, valor, notas) e permite movê-lo dali mesmo (mesma engine do RF-022).
+- **Critério de aceite:** mudar a etapa pela ficha reflete no kanban e na Helena.
+- **Origem:** descoberta ("o usuário terá liberdade de fazer isso pela agenda, no paciente direto ou pelos cards").
+
+**RF-014 — Resumo financeiro do paciente** · **Should** *(Fase 3)*
+- **Descrição:** na ficha: total gasto na clínica até hoje, valores em aberto, última visita, orçamentos (abertos/fechados) — dados do Clinicorp via espelho local.
+- **Critério de aceite:** valores conferem com o Clinicorp na última sincronização, com timestamp "atualizado em".
+- **Origem:** descrição inicial ("quanto ele já gastou na clínica...").
+
+### 3.3 Painéis — Kanban próprio (backend Helena)
+
+**RF-020 — Kanban com identidade visual Contact** · **Must**
+- **Descrição:** tela de painéis estilo kanban com o design da Contact (não o da Helena), exibindo colunas (etapas) e cards a partir do espelho local sincronizado com `GET /v2/panel` e `GET /v2/panel-card`.
+- **Critério de aceite:** o cliente final opera o funil inteiro sem nunca abrir a interface da Helena.
+- **Origem:** descoberta ("usaremos o back como estrutura mas o cliente verá apenas o front bonito com nossa identidade visual").
+
+**RF-021 — Etapas padrão do funil** · **Must**
+- **Descrição:** suportar o funil padrão **confirmado nos prints do painel real** ("AGENDAMENTOS - IA + CRC"): **LEADS → NÃO AGENDADO → AGENDADOS → REAGENDADO → CANCELOU → FALTOU → COMPARECIDO → COMPARECEU E NÃO FECHOU → COMPARECEU E FECHOU**. O mapeamento etapa↔StepId da Helena é configurável por conta (painéis podem variar por clínica). *Semântica confirmada:* a etapa **COMPARECIDO equivale também a "orçamento em aberto"** — paciente compareceu, orçamento gerado e em negociação, ainda sem desfecho (fechou/não fechou). Os dashboards tratam COMPARECIDO como "orçamentos em aberto".
+- **Critério de aceite:** as 9 etapas aparecem na ordem do painel real; o mapeamento é configurável na área admin.
+- **Origem:** D3 + prints do painel real (12/06/2026).
+
+**RF-022 — Movimentação manual de cards** · **Must**
+- **Descrição:** arrastar card entre colunas (ou mover via menu) atualiza a etapa na Helena via `PUT https://api.wts.chat/crm/v2/panel/card/{cardId}` com body `{ "fields": ["StepId", "Description", "TagIds"], "stepId": "...", "description": "...", "tagIds": [...] }`. **Validado em produção** pelo workflow n8n da clínica Salutar — a PoC está resolvida. Regra obrigatória: `tagIds` sempre em **merge** (tags existentes + novas, sem duplicar e sem substituir) e `description` preservada/anexada — nunca sobrescrita às cegas (ela carrega o resumo estruturado da IA: Status Atual, Estágio Parado, Dor Principal, Resumo Rápido, Instrução para o Futuro). Mover para COMPARECEU E FECHOU solicita o **valor fechado** (gravado no card).
+- **Critério de aceite:** card movido na nossa UI aparece na etapa correta na Helena em até 5s; tags e descrição da IA preservadas; valor fechado persiste no card.
+- **Origem:** D3, D4 + workflow n8n real (Salutar) fornecido em 12/06/2026.
+
+**RF-023 — Sincronização automática agenda → painel** · **Must**
+- **Descrição:** mapeamento automático de status da consulta para etapa do card:
+
+| Evento na agenda | Etapa destino do card |
+|---|---|
+| Consulta criada | AGENDADOS |
+| Cancelada | CANCELADOS |
+| Reagendada | REAGENDADOS |
+| Faltou (no_show) | FALTOSOS |
+| Compareceu (completed) | COMPARECIDO (= orçamento em aberto, aguardando desfecho) |
+| Desfecho "não fechou" | COMPARECEU E NÃO FECHOU |
+| Fechou (com valor) | COMPARECEU E FECHOU |
+| Lead sem agendamento após contato | NÃO AGENDADO |
+
+- O card é atualizado com: nome do lead, data, horário e etiquetas de unidade e CRC (ex.: `ELDORADO`, `FLAVIA`) ou `IA` quando agendado pelo agente.
+- **Critério de aceite:** cada transição de status na agenda reflete a etapa correta do card sem intervenção manual; falha de sync gera retry e alerta (ver RNF-014).
+- **Origem:** D3, D4 e descrição inicial.
+
+**RF-024 — Sincronização inbound (Helena → plataforma) via webhooks** · **Must**
+- **Descrição:** assinar webhooks da Helena (`/v1/webhook-subscription`) para eventos de card/contato/sessão; ao receber evento (ex.: card movido manualmente na Helena ou pelo n8n), atualizar o espelho local e, quando aplicável, o status da consulta vinculada.
+- **Validações:** idempotência por id do evento; loops de sincronização prevenidos por marcação de origem (ver Doc 2 §7).
+- **Critério de aceite:** card movido na Helena atualiza o kanban da plataforma em até 10s sem refresh manual.
+- **Origem:** D4 + capacidade confirmada da API Helena.
+
+**RF-025 — Etiquetas e dimensões do card** · **Must**
+- **Descrição:** todo card carrega etiquetas estruturadas em três famílias: **unidade** (ex.: Eldorado), **responsável/origem do agendamento** (ex.: `AGENDADO IA`, `AGENDADOS ANA` — uma etiqueta por CRC, até 4 por clínica) e **canal de origem do lead** (INSTAGRAM, GOOGLE, FACEBOOK, ORGÂNICO, INDICAÇÃO — já aplicadas pela automação n8n na entrada do lead). **Restrição confirmada:** a Helena NÃO permite criar etiquetas via API — elas são cadastradas manualmente no painel Helena e a plataforma as **lista** (`GET /v1/tag`) **e vincula** (tela de configuração: tag UUID ↔ significado: unidade/CRC/canal). Toda escrita de tags é em merge (RF-022). Essas etiquetas são as dimensões de filtro dos dashboards (RF-031).
+- **Critério de aceite:** admin vincula as tags existentes na tela de configuração; card criado por agendamento da IA carrega `AGENDADO IA` + unidade; dashboards filtram por qualquer família de etiqueta.
+- **Origem:** D3, D5 + prints e workflow n8n (12/06/2026).
+
+**RF-026 — Notas e anotações no card** · **Should**
+- **Descrição:** ler/criar notas do card via `/v1/panel-card/{cardid}/note`, exibidas no card e na ficha do paciente.
+- **Critério de aceite:** nota criada na plataforma aparece na Helena e vice-versa.
+- **Origem:** capacidade da API + visão 360° `[PREMISSA — complementa o histórico do paciente]`.
+
+### 3.4 Dashboard Gestão de Leads
+
+**RF-030 — KPIs do funil** · **Must**
+- **Descrição:** painel com métricas calculadas das colunas/cards (espelho local): leads recebidos, agendados, não agendados, cancelados, reagendados, faltosos, compareceu e fechou, compareceu e não fechou, orçamentos em aberto, **taxa de conversão por etapa**, **ticket médio** e **valor total fechado**.
+- **Critério de aceite:** números conferem com a contagem de cards por etapa no período filtrado.
+- **Origem:** D5 + descrição inicial.
+
+**RF-031 — Filtros do dashboard** · **Must**
+- **Descrição:** filtros combináveis: período (dia, semana, mês e intervalo custom com calendário), unidade, CRC, origem (IA/humano).
+- **Critério de aceite:** qualquer combinação de filtros recalcula KPIs e gráficos em < 2s (RNF-001).
+- **Origem:** D5.
+
+**RF-032 — Gráficos visuais elaborados** · **Must**
+- **Descrição:** no mínimo: funil de conversão (leads → fechou), série temporal de agendamentos/comparecimentos, ranking por CRC, comparativo IA vs humano, distribuição por unidade. Design de alto padrão visual conforme identidade Contact.
+- **Critério de aceite:** dashboards aprovados em revisão de design; gráficos interativos (hover, drill por filtro).
+- **Origem:** D5 ("quero gráficos visuais bem elaborados").
+
+**RF-033 — Acesso ao dashboard de leads** · **Must**
+- **Descrição:** visível a todos os perfis autenticados da conta.
+- **Origem:** D5.
+
+### 3.5 Dashboard Financeiro (Fase 3 — última fase)
+
+**RF-040 — KPIs financeiros consolidados** · **Must (na Fase 3)**
+- **Descrição:** faturamento do período, entradas, saídas, fluxo de caixa (`/financial/list_cash_flow`, `list_summary`), recebimentos (`list_receipt`, `list_payments`), valores em aberto e inadimplentes (`list_invoices` com filtro de status/vencimento), ticket médio de parcelas (`average_installments`).
+- **Critério de aceite:** valores batem com relatórios do Clinicorp na data da sincronização.
+- **Origem:** D6.
+
+**RF-041 — Formas de pagamento e entradas programadas** · **Should**
+- **Descrição:** detalhar por forma de pagamento (boleto, cartão, etc., conforme disponível na API) e exibir entradas programadas (parcelas futuras com data prevista).
+- **Critério de aceite:** lista de recebíveis futuros com data e forma de pagamento quando o Clinicorp fornecer o dado.
+- **Origem:** D6 ("se der para buscar se é boleto, entrada programada quando vai entrar").
+
+**RF-042 — Previsão de recebíveis (forecast)** · **Should**
+- **Descrição:** projeção dos próximos meses combinando parcelas a vencer + histórico de inadimplência (taxa de realização) — "algo inteligente para antecipar".
+- **Critério de aceite:** gráfico de projeção mensal (próximos 3–6 meses) com premissas exibidas.
+- **Origem:** D6.
+
+**RF-043 — Cobrança via WhatsApp** · **Should**
+- **Descrição:** na lista de inadimplentes/valores em aberto, botão que abre/envia mensagem via Helena (sessão ativa ou template) para o contato vinculado.
+- **Validações:** exigir confirmação antes do envio; registrar log da cobrança.
+- **Critério de aceite:** clicar "Cobrar" envia/abre a conversa com o paciente correto.
+- **Origem:** D6.
+
+**RF-044 — Acesso restrito ao financeiro** · **Must (na Fase 3)**
+- **Descrição:** dashboard financeiro e dados financeiros do paciente visíveis somente a usuários **admin** (a permissão espelha o papel admin — equivalente ao perfil admin da Helena, conforme D5).
+- **Critério de aceite:** recepcionista/CRC não acessa rotas nem telas financeiras (bloqueio no backend, não só na UI).
+- **Origem:** D5, D6.
+
+### 3.6 Automações
+
+**RF-050 — Lembrete/confirmação de consulta (D-1)** · **Must (Fase 2)**
+- **Descrição:** mensagem automática de lembrete via WhatsApp (Helena, `POST /v1/send/template` ou chatbot) no dia anterior à consulta, pedindo confirmação. Janela e texto configuráveis por conta.
+- **Critério de aceite:** consulta agendada para amanhã gera lembrete; log do envio visível na consulta.
+- **Origem:** D7 ("será interessante essa mensagem de confirmação — lembrete").
+
+**RF-051 — Resposta do paciente atualiza status e card** · **Must (Fase 2)**
+- **Descrição:** confirmação/cancelamento respondido pelo paciente no WhatsApp (processado pelo agente IA/n8n via habilidades já existentes `/api/agent/*`) atualiza o status da consulta e move o card (engine RF-023).
+- **Critério de aceite:** paciente responde "cancelar" → consulta cancelada + card em CANCELADOS, sem ação humana.
+- **Origem:** descrição inicial + D7.
+
+### 3.7 APIs Externas da Plataforma
+
+**RF-060 — API pública documentada** · **Must**
+- **Descrição:** expor e **documentar (OpenAPI/Swagger)** os grupos de endpoints: **Agenda** (consultas, slots, status), **Pacientes** (CRUD, vínculo Helena, 360°), **Painéis** (cards, movimentação, etapas), **Dashboards** (métricas agregadas), **Financeiro** (leitura, admin-only) e **Automations/Webhooks** (inscrição em eventos da plataforma). Autenticação por API Key (modelo `ai_api_keys` existente) com escopos por grupo.
+- **Critério de aceite:** documentação navegável publicada; n8n consome agenda+painéis usando somente a documentação.
+- **Origem:** D7 + descrição inicial ("preciso criar APIs externas nesse meu sistema").
+
+**RF-061 — Webhooks de saída da plataforma** · **Should**
+- **Descrição:** a plataforma emite eventos próprios (consulta criada/cancelada, card movido, paciente fechou) para URLs inscritas — permite automações n8n sem polling.
+- **Critério de aceite:** n8n recebe evento de "consulta cancelada" em até 10s.
+- **Origem:** D7 ("automações") `[PREMISSA — contrapartida natural do RF-060 para automação eficiente]`.
+
+### 3.8 Permissões e Perfis
+
+**RF-070 — Perfis de acesso** · **Must**
+- **Descrição:** perfis admin, recepcionista/CRC e dentista (modelo `users.role` existente). Financeiro = admin only; dashboards de leads = todos; configurações = admin.
+- **Critério de aceite:** matriz de permissão aplicada no backend (middleware) e refletida na navegação.
+- **Origem:** D5.
+
+---
+
+## 4. REQUISITOS NÃO FUNCIONAIS
+
+### 4.1 Desempenho
+- **RNF-001:** Dashboards respondem com p95 < 2s para períodos de até 12 meses — leitura **sempre do espelho local** (Supabase), nunca síncrona das APIs externas.
+- **RNF-002:** Sincronização agenda → card Helena concluída em até 5s (p95); inbound (webhook) processado em até 10s.
+- **RNF-003:** Agenda (visão diária/semanal) renderiza em < 1,5s com 200 consultas no período.
+
+### 4.2 Segurança
+- **RNF-010:** Tokens Helena e credenciais Clinicorp armazenados como secrets por conta (nunca no cliente/browser); todas as chamadas externas partem do backend.
+- **RNF-011:** LGPD — dados de pacientes (saúde + financeiro) com RLS por conta (multi-tenant), criptografia em trânsito (TLS) e em repouso (Supabase), logs de acesso a dados financeiros.
+- **RNF-012:** Endpoints financeiros exigem papel admin verificado no backend (defesa em profundidade, não só UI).
+- **RNF-013:** Webhooks de entrada validados (assinatura/segredo da subscription + verificação de origem) e idempotentes.
+
+### 4.3 Confiabilidade da Sincronização
+- **RNF-014:** Toda escrita na Helena passa por fila/outbox com retry exponencial (mín. 5 tentativas); falha definitiva gera alerta visível na UI (badge "sync pendente" no card/consulta) e registro em log de sincronização auditável.
+- **RNF-015:** Rate limits da Helena e do Clinicorp respeitados com backoff; sincronizações em lote usam endpoints batch quando disponíveis (`/v2/contact/batch`, paginação 100/página).
+- **RNF-016:** Sincronização financeira Clinicorp: job diário (madrugada) + atualização sob demanda (botão "Atualizar agora", admin) `[PREMISSA — D6 não exigiu near real-time; relatórios eficazes priorizados]`.
+
+### 4.4 Usabilidade
+- **RNF-020:** Interface 100% responsiva (desktop e tablet; uso primário desktop pela CRC).
+- **RNF-021:** Atualizações em tempo real na UI (Supabase Realtime) — card movido por outro usuário/IA aparece sem refresh.
+- **RNF-022:** Identidade visual Contact consistente em agenda, kanban e dashboards (design system próprio sobre Tailwind/Radix).
+
+### 4.5 Escalabilidade e Disponibilidade
+- **RNF-030:** Arquitetura multi-tenant preservada (accounts) — suportar dezenas de clínicas com painéis/tokens próprios.
+- **RNF-031:** Uptime alvo 99,5% (Vercel + Supabase); degradação graciosa: se Helena/Clinicorp estiverem fora, agenda continua operando e sync é re-enfileirada.
+- **RNF-032:** Backup diário do banco (Supabase PITR) e possibilidade de reprocessar webhooks perdidos via reconciliação periódica (job que compara espelho × Helena).
+
+---
+
+## 5. REQUISITOS DE INTEGRAÇÃO
+
+**RI-001 — Helena · Painéis e Cards**
+- **API (base real validada em produção):** `https://api.wts.chat/crm/...` — `GET /crm/v1/panel/card?PanelId=&ContactId=&PageSize=` (busca card do contato), `PUT /crm/v2/panel/card/{cardId}` com `{ fields: ["StepId","Description","TagIds"], stepId, description, tagIds }` (move card / atualiza descrição e tags), `GET /v2/panel` e `GET /v1/panel/{id}` (estrutura/etapas), `GET /v1/tag` (listar etiquetas para vínculo), notas `/v1/panel-card/{cardid}/note`.
+- **Protocolo:** REST JSON, Bearer token (`pn_...`). **Direção:** bidirecional (leitura para espelho + escrita de movimentação/valores).
+- **Dados:** painéis, etapas (StepId), cards (contato, tagIds, descrição estruturada da IA, responsável, valores, datas).
+- **Regras de escrita:** tagIds em merge; description preservada/anexada (carrega o resumo da IA).
+- **Falhas:** outbox + retry (RNF-014).
+
+**RI-002 — Helena · Webhooks (inbound)**
+- **API:** `GET /v1/webhook-event`, `POST /v1/webhook-subscription`.
+- **Direção:** Helena → plataforma. **Dados:** eventos de card, contato, sessão, mensagem.
+- **Falhas:** idempotência por event id; job de reconciliação diário cobre eventos perdidos.
+
+**RI-003 — Helena · Contatos**
+- **API:** `GET /v1/contact/phonenumber/{phone}`, `GET/POST /v1/contact`, `PUT /v2/contact/{id}`, tags, custom fields.
+- **Direção:** bidirecional. **Dados:** identidade do lead (contact id, lead id), telefone, tags.
+- **Falhas:** contato não encontrado → criação automática no agendamento `[PREMISSA]`; duplicado → resolução manual.
+
+**RI-004 — Helena · Mensagens e Templates**
+- **API:** `POST /v1/send/template` (lembretes), `POST /v1/message/send`, sessões (`/v2/session`, transfer — já integrado).
+- **Direção:** plataforma → Helena. **Dados:** lembretes D-1, cobranças (Fase 3), confirmações.
+- **Falhas:** template rejeitado/sessão inexistente → log + fallback para link wa.me (comportamento atual).
+
+**RI-005 — Clinicorp · Financeiro (somente leitura)**
+- **API:** Basic auth (Usuário API + Token). `GET /financial/list_invoices`, `list_payments`, `list_receipt`, `list_cash_flow`, `list_summary`, `average_installments`, `GET /payment/list`.
+- **Direção:** Clinicorp → plataforma (pull, job diário + sob demanda). **Dados:** faturas, pagamentos, fluxo de caixa, inadimplência, formas de pagamento.
+- **Falhas:** indisponibilidade → exibir último snapshot com timestamp; sem bloqueio do restante do sistema.
+
+**RI-006 — Clinicorp · Orçamentos e Pacientes (leitura)**
+- **API:** `GET /estimates/list`, `/estimates/get`, `/patient/get`, `/patient/list_estimates`, `/patient/list_appointments`.
+- **Direção:** pull. **Dados:** orçamentos (aberto/fechado, valores → apoio a ORÇAMENTOS EM ABERTO e ticket médio), totais por paciente (ficha 360°).
+- **Vínculo:** nome+telefone (chave Clinicorp, conforme D2) → matching com paciente local pelo telefone normalizado.
+- **Falhas:** paciente sem correspondência → ficha exibe "sem dados Clinicorp".
+
+**RI-007 — n8n / Agente IA (consumidor)**
+- **API:** habilidades existentes `/api/agent/*` + novas APIs públicas (RF-060) + webhooks de saída (RF-061).
+- **Direção:** n8n ↔ plataforma. **Autenticação:** API Key com escopos.
+- **Falhas:** respostas de erro padronizadas (códigos + mensagens) para o fluxo do agente tratar.
+
+---
+
+## 6. COMPONENTES DE IA
+
+**IA-001 — Agente de agendamento WhatsApp (existente, evoluído)**
+- **Função:** agendar, cancelar, remarcar e consultar via conversa no WhatsApp (n8n + LLM + habilidades `/api/agent/*`).
+- **Evolução nesta versão:** ao executar ações, alimentar a engine de sincronização de cards (etiqueta origem = IA) — sem mudança no fluxo conversacional.
+- **Fallback:** indisponibilidade do agente não afeta a agenda manual; mensagens não entendidas são transferidas para CRC (transfer já integrado).
+
+**IA-002 — Lembrete inteligente (Fase 2)**
+- **Função:** disparo D-1 e interpretação da resposta (confirma/cancela/reagenda) pelo fluxo do agente.
+- **Inputs:** consultas do dia seguinte. **Outputs:** status atualizado + card movido.
+- **Fallback:** sem resposta → consulta permanece `scheduled` e aparece como "não confirmada" na agenda.
+
+**IA-003 — Forecast financeiro (Fase 3)** `[PREMISSA — "algo inteligente" do D6 modelado inicialmente como projeção estatística, não LLM]`
+- **Função:** projeção de recebíveis (parcelas a vencer × taxa histórica de realização).
+- **Fallback:** sem histórico suficiente → exibe somente parcelas contratadas.
+
+---
+
+## 7. MATRIZ DE RASTREABILIDADE
+
+| Requisito | Persona / Etapa da jornada | Componente (Doc 2) |
+|---|---|---|
+| RF-001..005 | CRC · agendamento | Frontend Agenda + API slots/appointments |
+| RF-006, RF-023 | CRC, IA · pós-consulta | Engine de Sincronização de Cards (Sync Service) |
+| RF-007 | CRC · reagendamento | Frontend Agenda (DnD) |
+| RF-010..014 | CRC, Gestor · consulta do paciente | Tela Paciente 360° + Patient Service |
+| RF-020..026 | CRC, Gestor, IA · funil | Frontend Kanban + Panel Service + espelho Helena |
+| RF-024 | Sistema · sync inbound | Webhook Receiver |
+| RF-030..033 | Todos · gestão | Dashboard Leads + Metrics Service |
+| RF-040..044 | Admin · financeiro | Dashboard Financeiro + Clinicorp Sync |
+| RF-050..051 | Paciente, IA · lembrete | Automation Scheduler + Helena Messaging |
+| RF-060..061 | n8n, integradores | API Gateway pública + Webhooks de saída |
+| RF-070 | Todos | Auth/RBAC middleware |
+
+---
+
+## 8. FASEAMENTO CONFIRMADO
+
+| Fase | Conteúdo | Requisitos |
+|---|---|---|
+| **1** | Agenda dinâmica (correções) + Kanban próprio + sync bidirecional + Paciente 360° (sem financeiro) + APIs documentadas | RF-001..013, RF-020..026, RF-060, RF-070 |
+| **2** | Dashboard Gestão de Leads + Lembrete D-1 | RF-030..033, RF-050..051, RF-061 |
+| **3** | Integração Clinicorp + Dashboard Financeiro + cobrança WhatsApp + financeiro na ficha | RF-014, RF-040..044 |
+
+> **Pendências resolvidas (12/06/2026):** prints do painel real recebidos (etapas e etiquetas confirmadas — RF-021/RF-025) e PoC de movimentação validada pelo workflow n8n em produção (`PUT /crm/v2/panel/card/{id}` move o card — RF-022/RI-001).
+> **Decisão de integração:** a movimentação de cards passa a ser **nativa do backend da plataforma** (Card Sync Engine, single writer); o n8n permanece como orquestrador conversacional do chatbot, mas escreve via API da plataforma em vez de chamar a Helena diretamente (ver Doc 2, ADR 7).
+> **Ação de segurança:** rotacionar o token Helena exposto no workflow n8n compartilhado e migrar tokens para secret store.

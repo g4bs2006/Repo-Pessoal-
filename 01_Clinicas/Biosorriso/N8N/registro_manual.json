@@ -1,0 +1,514 @@
+{
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2544,
+        2304
+      ],
+      "id": "0dda61a0-cdbd-4d0e-99e6-5896036de08c",
+      "name": "Inicio (Manual)"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.wts.chat/crm/v1/panel/{{ $json.panel_id }}?IncludeDetails=Tags",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.helena_token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -2096,
+        2304
+      ],
+      "id": "87f0516f-f582-4bbc-9c22-2a87d272f15f",
+      "name": "Tags Card Painel"
+    },
+    {
+      "parameters": {
+        "url": "https://api.wts.chat/core/v1/tag?PageSize=200",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Entradas').first().json.helena_token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1872,
+        2304
+      ],
+      "id": "02d9245d-5fff-4bd4-87a9-841b9ff9efb8",
+      "name": "Tags Contato"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-exists",
+              "leftValue": "={{ $json.helena_company_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1200,
+        2304
+      ],
+      "id": "1c3bcfad-0035-4187-9d0b-9d16a8ce565b",
+      "name": "Ja Existe?"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "automacao_clinicas",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "helena_company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Montar Linha1').first().json.helena_company_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "nome",
+              "fieldValue": "={{ $('Montar Linha1').first().json.nome }}"
+            },
+            {
+              "fieldId": "helena_token",
+              "fieldValue": "={{ $('Montar Linha1').first().json.helena_token }}"
+            },
+            {
+              "fieldId": "panel_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.panel_id }}"
+            },
+            {
+              "fieldId": "step_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.step_id }}"
+            },
+            {
+              "fieldId": "back_panel_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.back_panel_id }}"
+            },
+            {
+              "fieldId": "agendado_step_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.agendado_step_id }}"
+            },
+            {
+              "fieldId": "ativo",
+              "fieldValue": "={{ $('Montar Linha1').first().json.ativo }}"
+            },
+            {
+              "fieldId": "fb_tag_nome",
+              "fieldValue": "={{ $('Montar Linha1').first().json.fb_tag_nome }}"
+            },
+            {
+              "fieldId": "fb_panel_tag_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.fb_panel_tag_id }}"
+            },
+            {
+              "fieldId": "fb_contact_tag_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.fb_contact_tag_id }}"
+            },
+            {
+              "fieldId": "ig_tag_nome",
+              "fieldValue": "={{ $('Montar Linha1').first().json.ig_tag_nome }}"
+            },
+            {
+              "fieldId": "ig_panel_tag_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.ig_panel_tag_id }}"
+            },
+            {
+              "fieldId": "ig_contact_tag_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.ig_contact_tag_id }}"
+            },
+            {
+              "fieldId": "org_tag_nome",
+              "fieldValue": "={{ $('Montar Linha1').first().json.org_tag_nome }}"
+            },
+            {
+              "fieldId": "org_panel_tag_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.org_panel_tag_id }}"
+            },
+            {
+              "fieldId": "org_contact_tag_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.org_contact_tag_id }}"
+            },
+            {
+              "fieldId": "status_obs",
+              "fieldValue": "={{ $('Montar Linha1').first().json.status_obs }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -976,
+        2208
+      ],
+      "id": "e4d7032d-e3f0-4c95-ad73-996f7e040d6c",
+      "name": "Atualizar Clinica",
+      "credentials": {
+        "supabaseApi": {
+          "id": "p1F5hpLgSQHugw7M",
+          "name": "Supa Gabriel"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "automacao_clinicas",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "helena_company_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.helena_company_id }}"
+            },
+            {
+              "fieldId": "nome",
+              "fieldValue": "={{ $('Montar Linha1').first().json.nome }}"
+            },
+            {
+              "fieldId": "helena_token",
+              "fieldValue": "={{ $('Montar Linha1').first().json.helena_token }}"
+            },
+            {
+              "fieldId": "panel_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.panel_id }}"
+            },
+            {
+              "fieldId": "step_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.step_id }}"
+            },
+            {
+              "fieldId": "back_panel_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.back_panel_id }}"
+            },
+            {
+              "fieldId": "agendado_step_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.agendado_step_id }}"
+            },
+            {
+              "fieldId": "ativo",
+              "fieldValue": "={{ $('Montar Linha1').first().json.ativo }}"
+            },
+            {
+              "fieldId": "fb_tag_nome",
+              "fieldValue": "={{ $('Montar Linha1').first().json.fb_tag_nome }}"
+            },
+            {
+              "fieldId": "fb_panel_tag_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.fb_panel_tag_id }}"
+            },
+            {
+              "fieldId": "fb_contact_tag_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.fb_contact_tag_id }}"
+            },
+            {
+              "fieldId": "ig_tag_nome",
+              "fieldValue": "={{ $('Montar Linha1').first().json.ig_tag_nome }}"
+            },
+            {
+              "fieldId": "ig_panel_tag_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.ig_panel_tag_id }}"
+            },
+            {
+              "fieldId": "ig_contact_tag_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.ig_contact_tag_id }}"
+            },
+            {
+              "fieldId": "org_tag_nome",
+              "fieldValue": "={{ $('Montar Linha1').first().json.org_tag_nome }}"
+            },
+            {
+              "fieldId": "org_panel_tag_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.org_panel_tag_id }}"
+            },
+            {
+              "fieldId": "org_contact_tag_id",
+              "fieldValue": "={{ $('Montar Linha1').first().json.org_contact_tag_id }}"
+            },
+            {
+              "fieldId": "status_obs",
+              "fieldValue": "={{ $('Montar Linha1').first().json.status_obs }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -976,
+        2400
+      ],
+      "id": "1f8e623c-00e8-4aed-ac10-7ebbdf14f352",
+      "name": "Criar Clinica",
+      "credentials": {
+        "supabaseApi": {
+          "id": "p1F5hpLgSQHugw7M",
+          "name": "Supa Gabriel"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Montar Linha1').first().json;\nconst avisos = m._avisos || [];\nreturn [{ json: {\n  resumo: m._resumo,\n  clinica: m.nome,\n  helena_company_id: m.helena_company_id,\n  avisos,\n  acao_necessaria: avisos.length ? 'Revisar/corrigir os IDs de etiqueta (status_obs) na tabela automacao_clinicas.' : 'Nenhuma. Config completa.'\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -752,
+        2304
+      ],
+      "id": "dc6a43ba-3c1a-4edb-8896-9dc0937df84c",
+      "name": "Resultado"
+    },
+    {
+      "parameters": {
+        "jsCode": "// panel_id e step_id vêm das Entradas (informados por você).\n// As etiquetas são resolvidas por NOME (palavra-chave). Saída ACHATADA p/ o node nativo.\nconst entradas = $('Entradas').first().json;\n\nconst painelResp = $('Tags Card Painel').first().json;\nconst cardTags = painelResp.tags || [];\nconst contatoResp = $('Tags Contato').first().json;\nconst contatoTags = Array.isArray(contatoResp) ? contatoResp : (contatoResp.items ?? []);\n\nconst norm = (s) => (s || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().trim();\nconst achar = (tags, kw) => tags.filter(t => norm(t.name).includes(kw));\n\nconst REGRAS = [ { p: 'fb', kw: 'facebook' }, { p: 'ig', kw: 'instagram' }, { p: 'org', kw: 'organico' } ];\nconst ROTULO = { fb: 'FACEBOOK', ig: 'INSTAGRAM', org: 'ORGÂNICO' };\n\nconst out = {\n  helena_company_id: entradas.companyId,\n  nome: (entradas.nome && entradas.nome.trim()) ? entradas.nome.trim() : 'Sem nome',\n  helena_token: entradas.helena_token,\n  panel_id: entradas.panel_id,\n  step_id: entradas.step_id,\n  back_panel_id: entradas.back_panel_id,\n  agendado_step_id: entradas.agendado_step_id,\n  ativo: true\n};\n\nconst avisos = [];\nfor (const r of REGRAS) {\n  const card = achar(cardTags, r.kw);\n  const contato = achar(contatoTags, r.kw);\n  if (card.length !== 1) avisos.push(`Tag CARD ${ROTULO[r.p]}: ${card.length} candidata(s) -> ${card.map(t=>t.name).join(' | ') || 'nenhuma'}`);\n  if (contato.length !== 1) avisos.push(`Tag CONTATO ${ROTULO[r.p]}: ${contato.length} candidata(s) -> ${contato.map(t=>t.name).join(' | ') || 'nenhuma'}`);\n  out[`${r.p}_tag_nome`] = ROTULO[r.p];\n  out[`${r.p}_panel_tag_id`] = card[0]?.id ?? null;\n  out[`${r.p}_contact_tag_id`] = contato[0]?.id ?? null;\n}\nout.status_obs = avisos.length ? avisos.join(' | ') : 'ok';\nout._avisos = avisos;\nout._resumo = { panel_id: entradas.panel_id, step_id: entradas.step_id };\n\nreturn [{ json: out }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1648,
+        2304
+      ],
+      "id": "7ff2ae6e-ece0-4028-92c3-44735621ce4a",
+      "name": "Montar Linha1"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "automacao_clinicas",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "helena_company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Montar Linha1').first().json.helena_company_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1424,
+        2304
+      ],
+      "id": "f9044a10-67d8-4def-81c3-b323010ce1e2",
+      "name": "Verificar Existe1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "p1F5hpLgSQHugw7M",
+          "name": "Supa Gabriel"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "in-1",
+              "name": "companyId",
+              "value": "94732f06-3633-4d01-a32e-080fe0fbcbc3",
+              "type": "string"
+            },
+            {
+              "id": "in-2",
+              "name": "helena_token",
+              "value": "pn_lveIqFdsp0MADkdhSN12VBIevVdWKPYvNdGR8wHYA",
+              "type": "string"
+            },
+            {
+              "id": "in-3",
+              "name": "nome",
+              "value": "Biosorriso",
+              "type": "string"
+            },
+            {
+              "id": "in-4",
+              "name": "panel_id",
+              "value": "86675c54-e8ba-4a30-b3e8-05c0e90f64f4",
+              "type": "string"
+            },
+            {
+              "id": "in-5",
+              "name": "step_id",
+              "value": "e461a7ee-e5c7-4255-9039-9153da59b05e",
+              "type": "string"
+            },
+            {
+              "id": "in-7",
+              "name": "agendado_step_id",
+              "value": "d7d72179-7642-4c58-940a-97ef0d76e16f",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2320,
+        2304
+      ],
+      "id": "391ef17c-4911-438f-9348-c42e05f47c7c",
+      "name": "Entradas"
+    }
+  ],
+  "connections": {
+    "Inicio (Manual)": {
+      "main": [
+        [
+          {
+            "node": "Entradas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tags Card Painel": {
+      "main": [
+        [
+          {
+            "node": "Tags Contato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tags Contato": {
+      "main": [
+        [
+          {
+            "node": "Montar Linha1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ja Existe?": {
+      "main": [
+        [
+          {
+            "node": "Atualizar Clinica",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Criar Clinica",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualizar Clinica": {
+      "main": [
+        [
+          {
+            "node": "Resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar Clinica": {
+      "main": [
+        [
+          {
+            "node": "Resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar Linha1": {
+      "main": [
+        [
+          {
+            "node": "Verificar Existe1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Existe1": {
+      "main": [
+        [
+          {
+            "node": "Ja Existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entradas": {
+      "main": [
+        [
+          {
+            "node": "Tags Card Painel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d1a2ea4f12ae9ebd3132590ec74e61784d3b49e17967bcb70d511f83551a7c49"
+  }
+}

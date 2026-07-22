@@ -1,0 +1,7 @@
+{
+  "action": "realizar_agendamento",
+  "telefone_cliente": "19987654321",
+  "nome_cliente": "Maria Oliveira",
+  "data_iso": "2026-05-16T13:00:00",
+  "spin": "Teste de agendamento no sábado após 12:00 — deve retornar erro de expediente."
+}

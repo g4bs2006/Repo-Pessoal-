@@ -1,0 +1,1828 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Onboarding Agente IA — Reunião</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    :root {
+      --sb: #0F1923;
+      --sb2: #172230;
+      --sb-t: #5E7A8C;
+      --sb-ta: #A8C3D0;
+      --bg: #F2F1ED;
+      --sur: #FFFFFF;
+      --bdr: #E3E2DC;
+      --bdr2: #D0CFC8;
+      --tx: #17171A;
+      --tm: #5A5A56;
+      --tl: #9E9E99;
+      --ac: #1A9962;
+      --acl: #E2F5ED;
+      --ac2: #137A4D;
+      --def: #C85A18;
+      --defl: #FDF0E8;
+      --def2: rgba(200, 90, 24, .18);
+      --lk: #1A5499;
+      --lkb: #E8F1FB;
+      --tgb: #F0EAF9;
+      --tg: #6B28A0;
+      --wb: #FEF3E4;
+      --w: #9A5000;
+      --rb: #FCEAEA;
+      --rd: #AA2A2A;
+      --skb: #E8F1FB;
+      --sk: #1A5499;
+      --rad: 9px;
+    }
+
+    html {
+      scroll-behavior: smooth
+    }
+
+    body {
+      font-family: 'IBM Plex Sans', sans-serif;
+      background: var(--bg);
+      color: var(--tx);
+      display: flex;
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.5
+    }
+
+    /* ── SIDEBAR ── */
+    .sb {
+      width: 252px;
+      min-width: 252px;
+      background: var(--sb);
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex-shrink: 0
+    }
+
+    .sb-logo {
+      padding: 22px 20px 16px;
+      border-bottom: 1px solid var(--sb2)
+    }
+
+    .sb-eyebrow {
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--sb-t);
+      margin-bottom: 4px
+    }
+
+    .sb-title {
+      font-family: 'Sora', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.3
+    }
+
+    .sb-nav {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0
+    }
+
+    .sb-nav::-webkit-scrollbar {
+      width: 3px
+    }
+
+    .sb-nav::-webkit-scrollbar-thumb {
+      background: var(--sb2);
+      border-radius: 2px
+    }
+
+    .sn {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 16px;
+      cursor: pointer;
+      transition: all .15s;
+      border-left: 3px solid transparent;
+      text-decoration: none;
+      user-select: none
+    }
+
+    .sn:hover {
+      background: rgba(255, 255, 255, .04)
+    }
+
+    .sn.active {
+      background: rgba(255, 255, 255, .06);
+      border-left-color: var(--ac)
+    }
+
+    .sn-num {
+      font-family: 'Sora', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--sb-t);
+      min-width: 16px;
+      padding-top: 2px;
+      transition: color .15s
+    }
+
+    .sn.active .sn-num {
+      color: var(--ac)
+    }
+
+    .sn-info {
+      flex: 1
+    }
+
+    .sn-name {
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--sb-t);
+      transition: color .15s;
+      line-height: 1.3
+    }
+
+    .sn.active .sn-name {
+      color: #fff
+    }
+
+    .sn-sub {
+      font-size: 10.5px;
+      color: rgba(94, 122, 140, .55);
+      margin-top: 1px;
+      line-height: 1.3;
+      display: none
+    }
+
+    .sn.active .sn-sub {
+      display: block;
+      color: rgba(168, 195, 208, .45)
+    }
+
+    .sb-foot {
+      padding: 14px 18px;
+      border-top: 1px solid var(--sb2)
+    }
+
+    .pg-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px
+    }
+
+    .pg-lbl {
+      font-size: 10px;
+      color: var(--sb-t)
+    }
+
+    .pg-pct {
+      font-family: 'Sora', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--ac)
+    }
+
+    .pg-bar {
+      height: 3px;
+      background: var(--sb2);
+      border-radius: 2px;
+      overflow: hidden
+    }
+
+    .pg-fill {
+      height: 100%;
+      background: var(--ac);
+      border-radius: 2px;
+      transition: width .5s
+    }
+
+    /* ── MAIN ── */
+    .main {
+      flex: 1;
+      min-width: 0;
+      overflow-y: auto;
+      height: 100vh
+    }
+
+    .main::-webkit-scrollbar {
+      width: 6px
+    }
+
+    .main::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, .1);
+      border-radius: 3px
+    }
+
+    .top-bar {
+      background: var(--sur);
+      border-bottom: 1px solid var(--bdr);
+      padding: 13px 36px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10
+    }
+
+    .top-crumb {
+      font-size: 12px;
+      color: var(--tl);
+      display: flex;
+      align-items: center;
+      gap: 6px
+    }
+
+    .top-crumb strong {
+      color: var(--tx)
+    }
+
+    .top-right {
+      display: flex;
+      gap: 8px;
+      align-items: center
+    }
+
+    .content {
+      padding: 40px 40px 80px;
+      max-width: 860px
+    }
+
+    /* ── SECTION ── */
+    .sec {
+      margin-bottom: 60px;
+      scroll-margin-top: 64px
+    }
+
+    .sec-head {
+      margin-bottom: 24px
+    }
+
+    .sec-head h2 {
+      font-family: 'Sora', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--tx);
+      display: flex;
+      align-items: center;
+      gap: 10px
+    }
+
+    .sec-num {
+      font-family: 'Sora', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--tl);
+      background: var(--bdr);
+      border-radius: 20px;
+      padding: 2px 9px
+    }
+
+    .sec-desc {
+      font-size: 13.5px;
+      color: var(--tm);
+      margin-top: 6px;
+      line-height: 1.7;
+      max-width: 680px
+    }
+
+    .sec-divider {
+      height: 1px;
+      background: var(--bdr);
+      margin-bottom: 20px
+    }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--sur);
+      border: 1px solid var(--bdr);
+      border-radius: var(--rad);
+      padding: 22px 24px;
+      margin-bottom: 14px
+    }
+
+    .card+.card {
+      margin-top: 0
+    }
+
+    .card-hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px
+    }
+
+    .card-hdr-l {
+      display: flex;
+      align-items: center;
+      gap: 8px
+    }
+
+    .card-icon {
+      font-size: 16px
+    }
+
+    .card-title {
+      font-family: 'Sora', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--tx)
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px
+    }
+
+    .card-grid.g3 {
+      grid-template-columns: 1fr 1fr 1fr
+    }
+
+    .full {
+      grid-column: 1/-1
+    }
+
+    /* ── FIELDS ── */
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px
+    }
+
+    .field label {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--tm);
+      letter-spacing: .5px;
+      text-transform: uppercase
+    }
+
+    .field input,
+    .field textarea,
+    .field select {
+      border: 1px solid var(--bdr);
+      border-radius: 6px;
+      padding: 9px 12px;
+      font-size: 13.5px;
+      color: var(--tx);
+      background: var(--sur);
+      font-family: inherit;
+      transition: border-color .15s, box-shadow .15s;
+      width: 100%
+    }
+
+    .field input:focus,
+    .field textarea:focus,
+    .field select:focus {
+      outline: none;
+      border-color: var(--ac);
+      box-shadow: 0 0 0 3px rgba(26, 153, 98, .09)
+    }
+
+    .field textarea {
+      resize: vertical;
+      min-height: 88px;
+      line-height: 1.65
+    }
+
+    .hint {
+      font-size: 11px;
+      color: var(--tl);
+      line-height: 1.5
+    }
+
+    select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%235A5A56' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 11px center;
+      padding-right: 30px
+    }
+
+    input[type=checkbox] {
+      width: 15px;
+      height: 15px;
+      accent-color: var(--ac);
+      cursor: pointer;
+      flex-shrink: 0
+    }
+
+    input[type=time] {
+      border: 1px solid var(--bdr);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 13px;
+      color: var(--tx);
+      background: var(--sur);
+      font-family: inherit;
+      transition: border-color .15s
+    }
+
+    input[type=time]:disabled {
+      background: var(--bg);
+      color: var(--tl);
+      border-color: var(--bdr)
+    }
+
+    input[type=time]:focus {
+      outline: none;
+      border-color: var(--ac)
+    }
+
+    /* ── SECTION LABEL ── */
+    .glbl {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      color: var(--tl);
+      margin: 20px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--bdr)
+    }
+
+    .glbl:first-child {
+      margin-top: 0
+    }
+
+    /* ── LOCK CARDS (hab/tags) ── */
+    .lc {
+      background: var(--sur);
+      border: 1px solid var(--bdr);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px
+    }
+
+    .lc-icon {
+      flex-shrink: 0;
+      font-size: 15px;
+      margin-top: 1px;
+      color: var(--lk)
+    }
+
+    .lc-body {
+      flex: 1;
+      min-width: 0
+    }
+
+    .lc-name {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--tx)
+    }
+
+    .lc-desc {
+      font-size: 12.5px;
+      color: var(--tm);
+      margin-top: 4px;
+      line-height: 1.6
+    }
+
+    .lc-meta {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px
+    }
+
+    .badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600
+    }
+
+    .b-inc {
+      background: var(--acl);
+      color: #13794C
+    }
+
+    .b-sk {
+      background: var(--skb);
+      color: var(--sk)
+    }
+
+    .b-tg {
+      background: var(--tgb);
+      color: var(--tg)
+    }
+
+    .b-par {
+      background: var(--wb);
+      color: var(--w)
+    }
+
+    .b-ext {
+      background: var(--lkb);
+      color: var(--lk)
+    }
+
+    .b-lock {
+      background: #F0F0EC;
+      color: var(--tl)
+    }
+
+    /* ── AGENDA ── */
+    .ag-table {
+      width: 100%;
+      border-collapse: collapse
+    }
+
+    .ag-table th {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: var(--tl);
+      padding: 6px 10px;
+      text-align: left;
+      border-bottom: 2px solid var(--bdr)
+    }
+
+    .ag-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--bdr);
+      vertical-align: middle
+    }
+
+    .ag-table tr:last-child td {
+      border-bottom: none
+    }
+
+    .ag-table tr:hover td {
+      background: var(--bg)
+    }
+
+    .day-name {
+      font-size: 13.5px;
+      font-weight: 500;
+      color: var(--tx)
+    }
+
+    .day-off {
+      color: var(--tl)
+    }
+
+    .time-range {
+      display: flex;
+      align-items: center;
+      gap: 8px
+    }
+
+    .time-sep {
+      font-size: 12px;
+      color: var(--tl)
+    }
+
+    /* ── OBJEÇÕES ── */
+    .obj {
+      background: var(--sur);
+      border: 1px solid var(--bdr);
+      border-radius: 9px;
+      margin-bottom: 10px;
+      overflow: hidden
+    }
+
+    .obj-hdr {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 13px 18px;
+      cursor: pointer;
+      transition: background .12s;
+      user-select: none
+    }
+
+    .obj-hdr:hover {
+      background: var(--bg)
+    }
+
+    .obj-idx {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--tl);
+      background: var(--bg);
+      border-radius: 5px;
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0
+    }
+
+    .obj-title-text {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--tx);
+      flex: 1
+    }
+
+    .obj-chev {
+      font-size: 10px;
+      color: var(--tl);
+      transition: transform .2s;
+      flex-shrink: 0
+    }
+
+    .obj.open .obj-chev {
+      transform: rotate(180deg)
+    }
+
+    .obj-body {
+      display: none;
+      padding: 0 18px 18px
+    }
+
+    .obj.open .obj-body {
+      display: block
+    }
+
+    /* ── BOXES ── */
+    .info-box {
+      background: var(--acl);
+      border: 1px solid rgba(26, 153, 98, .2);
+      border-radius: 7px;
+      padding: 11px 15px;
+      font-size: 12.5px;
+      color: #115C3A;
+      line-height: 1.65;
+      margin-bottom: 14px
+    }
+
+    .warn-box {
+      background: var(--wb);
+      border: 1px solid rgba(200, 90, 24, .2);
+      border-radius: 7px;
+      padding: 11px 15px;
+      font-size: 12.5px;
+      color: var(--w);
+      line-height: 1.65;
+      margin-bottom: 14px
+    }
+
+    .lock-box {
+      background: #F7F7F4;
+      border: 1px solid var(--bdr);
+      border-radius: 7px;
+      padding: 11px 15px;
+      font-size: 12.5px;
+      color: var(--tm);
+      line-height: 1.65;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px
+    }
+
+    /* ── BUTTONS ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
+      transition: all .15s;
+      white-space: nowrap
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--tm);
+      border: 1px solid var(--bdr2)
+    }
+
+    .btn-ghost:hover {
+      background: var(--bg);
+      border-color: var(--bdr2)
+    }
+
+    .btn-primary {
+      background: var(--ac);
+      color: #fff
+    }
+
+    .btn-primary:hover {
+      background: var(--ac2)
+    }
+
+    .btn-def {
+      background: var(--defl);
+      color: var(--def);
+      border: 1px solid rgba(200, 90, 24, .22)
+    }
+
+    .btn-def:hover {
+      background: rgba(200, 90, 24, .12)
+    }
+
+    .btn-dark {
+      background: var(--tx);
+      color: #fff
+    }
+
+    .btn-dark:hover {
+      background: #2E2E2A
+    }
+
+    .btn-sm {
+      padding: 5px 11px;
+      font-size: 11.5px
+    }
+
+    /* ── EXPORT ── */
+    .export-pre {
+      background: var(--sb);
+      border-radius: 8px;
+      padding: 20px 24px;
+      color: #96BAC8;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11.5px;
+      line-height: 1.8;
+      max-height: 320px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      margin-bottom: 14px
+    }
+
+    .export-pre::-webkit-scrollbar {
+      width: 4px
+    }
+
+    .export-pre::-webkit-scrollbar-thumb {
+      background: #2A3D4D;
+      border-radius: 2px
+    }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed;
+      bottom: 22px;
+      right: 22px;
+      background: var(--tx);
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 7px;
+      font-size: 12.5px;
+      font-weight: 500;
+      transform: translateY(60px);
+      opacity: 0;
+      transition: all .25s;
+      z-index: 999;
+      pointer-events: none;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, .18)
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1
+    }
+
+    /* ── CHECK LIST ── */
+    .chk-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 7px 0;
+      cursor: pointer
+    }
+
+    .chk-row input {
+      pointer-events: none
+    }
+
+    .chk-label {
+      font-size: 13.5px;
+      color: var(--tx)
+    }
+
+    .chk-note {
+      font-size: 11.5px;
+      color: var(--tl);
+      margin-left: 2px
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ── SIDEBAR ── -->
+  <nav class="sb">
+    <div class="sb-logo">
+      <div class="sb-eyebrow">Agente IA / Reunião</div>
+      <div class="sb-title">Onboarding<br>da Clínica</div>
+    </div>
+    <div class="sb-nav" id="sbNav"></div>
+    <div class="sb-foot">
+      <div class="pg-row">
+        <span class="pg-lbl">Preenchimento</span>
+        <span class="pg-pct" id="pgPct">—</span>
+      </div>
+      <div class="pg-bar">
+        <div class="pg-fill" id="pgFill" style="width:0%"></div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── MAIN ── -->
+  <div class="main" id="mainScroll">
+    <div class="top-bar">
+      <div class="top-crumb">
+        <span>Onboarding</span>
+        <span style="color:var(--bdr2)">›</span>
+        <strong id="topCrumb">Identidade</strong>
+      </div>
+      <div class="top-right">
+        <button class="btn btn-ghost btn-sm"
+          onclick="buildPreview();document.getElementById('sec-exportar').scrollIntoView({behavior:'smooth'})">⬇
+          Exportar .md</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ══ 1. IDENTIDADE ══ -->
+      <section class="sec" id="sec-identidade" data-label="Identidade">
+        <div class="sec-head">
+          <h2><span class="sec-num">01</span> Identidade do Agente</h2>
+          <p class="sec-desc">Quem é o agente, qual a clínica, quem é o dentista responsável e como o paciente será
+            atendido.</p>
+        </div>
+        <div class="sec-divider"></div>
+        <div class="card">
+          <div class="card-hdr">
+            <div class="card-hdr-l"><span class="card-icon">🤖</span><span class="card-title">Agente e Clínica</span>
+            </div>
+            <button class="btn btn-def btn-sm" onclick="fillDefault('identidade')">↓ Exemplo: Volta a Sorrir</button>
+          </div>
+          <div class="card-grid">
+            <div class="field"><label>Nome do Agente</label><input id="agente_nome" type="text"
+                placeholder="Ex: Morgana">
+              <div class="hint">Como o agente se apresenta aos pacientes.</div>
+            </div>
+            <div class="field"><label>Cargo / Função</label><input id="agente_cargo" type="text"
+                placeholder="Ex: Secretária Virtual e SDR"></div>
+            <div class="field"><label>Nome da Clínica</label><input id="clinica_nome" type="text"
+                placeholder="Ex: IBS Implantes"></div>
+            <div class="field"><label>Dentista / Responsável</label><input id="dentista_nome" type="text"
+                placeholder="Ex: Dra. Ila">
+              <div class="hint">Nome usado nas mensagens ao paciente.</div>
+            </div>
+            <div class="field"><label>Cidade / Estado</label><input id="cidade_estado" type="text"
+                placeholder="Ex: Tubarão — SC"></div>
+            <div class="field"><label>Telefone da Clínica</label><input id="telefone_clinica" type="text"
+                placeholder="Ex: (62) 99315-7227"></div>
+            <div class="field"><label>Instagram / Redes</label><input id="redes_sociais" type="text"
+                placeholder="Ex: @ibsimplantes"></div>
+            <div class="field"><label>Anos de Experiência</label><input id="anos_experiencia" type="text"
+                placeholder="Ex: 15 anos"></div>
+            <div class="field full">
+              <label>Especialidades / Serviços Principais</label>
+              <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 6px;">
+                <label class="chk-row" style="padding:0; align-items:flex-start;"><input type="checkbox" class="esp-chk"
+                    id="esp_implantes" value="Implantes e Próteses" style="margin-top:2px"><span
+                    class="chk-label">Implantes e Próteses</span></label>
+                <label class="chk-row" style="padding:0; align-items:flex-start;"><input type="checkbox" class="esp-chk"
+                    id="esp_ortodontia" value="Ortodontia (Aparelhos)" style="margin-top:2px"><span
+                    class="chk-label">Ortodontia (Aparelhos)</span></label>
+                <label class="chk-row" style="padding:0; align-items:flex-start;"><input type="checkbox" class="esp-chk"
+                    id="esp_lentes" value="Lentes de Contato e Facetas" style="margin-top:2px"><span
+                    class="chk-label">Lentes e Facetas</span></label>
+                <label class="chk-row" style="padding:0; align-items:flex-start;"><input type="checkbox" class="esp-chk"
+                    id="esp_harmonizacao" value="Harmonização Orofacial" style="margin-top:2px"><span
+                    class="chk-label">Harmonização Orofacial</span></label>
+                <label class="chk-row" style="padding:0; align-items:flex-start;"><input type="checkbox" class="esp-chk"
+                    id="esp_clinica_geral" value="Clínica Geral e Limpeza" style="margin-top:2px"><span
+                    class="chk-label">Clínica Geral e Limpeza</span></label>
+                <label class="chk-row" style="padding:0; align-items:flex-start;"><input type="checkbox" class="esp-chk"
+                    id="esp_odontopediatria" value="Odontopediatria" style="margin-top:2px"><span
+                    class="chk-label">Odontopediatria</span></label>
+                <label class="chk-row" style="padding:0; align-items:flex-start;"><input type="checkbox" class="esp-chk"
+                    id="esp_endodontia" value="Endodontia (Canal)" style="margin-top:2px"><span
+                    class="chk-label">Endodontia (Canal)</span></label>
+                <label class="chk-row" style="padding:0; align-items:flex-start;"><input type="checkbox" class="esp-chk"
+                    id="esp_periodontia" value="Periodontia (Gengiva)" style="margin-top:2px"><span
+                    class="chk-label">Periodontia (Gengiva)</span></label>
+                <label class="chk-row" style="padding:0; align-items:flex-start;"><input type="checkbox" class="esp-chk"
+                    id="esp_extracao" value="Extração (Sisos)" style="margin-top:2px"><span class="chk-label">Extração
+                    (Sisos)</span></label>
+                <div style="display:flex; align-items:center; gap:10px; grid-column: span 2;">
+                  <label class="chk-row" style="padding:0;"><input type="checkbox" id="esp_outros_chk"
+                      onchange="toggleEspOutros()"><span class="chk-label">Outros</span></label>
+                  <div id="esp_outros_wrap" style="display:none; flex:1;">
+                    <input type="text" id="esp_outros_text" placeholder="Especifique outros..."
+                      style="padding: 5px 10px; font-size: 13px;">
+                  </div>
+                </div>
+              </div>
+              <div class="hint" style="margin-top:6px">Selecione os principais serviços oferecidos.</div>
+            </div>
+            <div class="field full"><label>Público-alvo</label><textarea id="publico_alvo"
+                placeholder="Descreva o perfil do paciente ideal..." style="min-height:70px"></textarea></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hdr">
+            <div class="card-hdr-l"><span class="card-icon">💬</span><span class="card-title">Transbordo e
+                Avaliação</span></div>
+            <button class="btn btn-def btn-sm" onclick="fillDefault('transbordo')">↓ Exemplo: Volta a Sorrir</button>
+          </div>
+          <div class="card-grid">
+            <div class="field"><label>Transferência para (humano)</label><input id="transbordo_para" type="text"
+                placeholder="Ex: a Morgana">
+              <div class="hint">O agente diz: "Vou chamar [este campo] aqui para te ajudar."</div>
+            </div>
+            <div class="field"><label>Termo para avaliação</label><select id="avaliacao_termo">
+                <option value="gratuita">gratuita</option>
+                <option value="sem custo">sem custo</option>
+                <option value="sem valor">sem valor</option>
+                <option value="outro">outro (preencher abaixo)</option>
+              </select>
+              <div class="hint">⚠️ Nunca usar a palavra "grátis".</div>
+            </div>
+            <div class="field full" id="avaliacao_custom_wrap" style="display:none"><label>Termo
+                personalizado</label><input id="avaliacao_custom" type="text"
+                placeholder="Descreva como a avaliação deve ser chamada"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hdr">
+            <div class="card-hdr-l"><span class="card-icon">💳</span><span class="card-title">Convênios e
+                Pagamento</span></div>
+            <button class="btn btn-def btn-sm" onclick="fillDefault('pagamento')">↓ Exemplo: Volta a Sorrir</button>
+          </div>
+          <div class="card-grid">
+            <div class="field"><label>Aceita convênios?</label><select id="convenios_aceita"
+                onchange="toggleConvenios()">
+                <option value="nao">Não — exclusivamente particular</option>
+                <option value="sim">Sim</option>
+              </select></div>
+            <div class="field" id="convenios_quais_wrap" style="display:none"><label>Quais convênios?</label><input
+                id="convenios_quais" type="text" placeholder="Ex: Vida Cotidiana, PAFT"></div>
+            <div class="field full"><label>Formas de pagamento</label><input id="pagamento" type="text"
+                placeholder="Ex: Cartão até 18x, débito, PIX, boleto, dinheiro. 5% desconto PIX/dinheiro."></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ 2. AGENDA ══ -->
+      <section class="sec" id="sec-agenda" data-label="Agenda">
+        <div class="sec-head">
+          <h2><span class="sec-num">02</span> Agenda e Horários</h2>
+          <p class="sec-desc">Configure os dias e horários de atendimento. O agente nunca oferecerá horários fora desses
+            limites.</p>
+        </div>
+        <div class="sec-divider"></div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card-hdr">
+            <div class="card-hdr-l"><span class="card-icon">🗂️</span><span class="card-title">Sistema de Agenda</span></div>
+          </div>
+          <div class="card-grid">
+            <div class="field">
+              <label>Qual sistema a clínica usa para agenda?</label>
+              <select id="sistema_agenda">
+                <option value="">— Selecione —</option>
+                <option value="Google Agenda">Google Agenda</option>
+                <option value="Clinicorp">Clinicorp</option>
+                <option value="Controle Odonto">Controle Odonto</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hdr">
+            <div class="card-hdr-l"><span class="card-icon">📅</span><span class="card-title">Dias e Horários de
+                Atendimento</span></div>
+          </div>
+          <table class="ag-table">
+            <thead>
+              <tr>
+                <th style="width:36px"></th>
+                <th>Dia</th>
+                <th>Abre</th>
+                <th style="width:24px"></th>
+                <th>Fecha</th>
+              </tr>
+            </thead>
+            <tbody id="agendaBody"></tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="card-hdr">
+            <div class="card-hdr-l"><span class="card-icon">🍽️</span><span class="card-title">Intervalo de
+                Almoço</span></div>
+          </div>
+          <label class="chk-row" style="margin-bottom:12px">
+            <input type="checkbox" id="tem_almoco" onchange="toggleAlmoco()">
+            <span class="chk-label">A clínica fecha para almoço?</span>
+          </label>
+          <div id="almoco_wrap" style="display:none">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div class="field"><label>Início</label><input type="time" id="almoco_ini" value="12:00"></div>
+              <div style="color:var(--tl);margin-top:20px;font-size:12px">até</div>
+              <div class="field"><label>Fim</label><input type="time" id="almoco_fim" value="13:30"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hdr">
+            <div class="card-hdr-l"><span class="card-icon">⚙️</span><span class="card-title">Configuração da
+                Consulta</span></div>
+          </div>
+          <div class="card-grid g3">
+            <div class="field"><label>Duração da avaliação</label><select id="consulta_duracao">
+                <option value="15">15 minutos</option>
+                <option value="20">20 minutos</option>
+                <option value="30" selected>30 minutos</option>
+                <option value="45">45 minutos</option>
+                <option value="60">1 hora</option>
+                <option value="90">1h 30min</option>
+              </select></div>
+            <div class="field"><label>Pacientes por horário</label><select id="pacientes_por_horario">
+                <option value="1" selected>1 paciente</option>
+                <option value="2">2 pacientes</option>
+                <option value="3">3 pacientes</option>
+                <option value="livre">Sem limite</option>
+              </select></div>
+            <div class="field"><label>Aceita encaixe fora de horário?</label><select id="aceita_encaixes">
+                <option value="emergencia" selected>Só emergências</option>
+                <option value="nao">Não aceita</option>
+                <option value="sim">Sim, aceita</option>
+              </select></div>
+            <div class="field full"><label>Observações de agenda (opcional)</label><input id="agenda_obs" type="text"
+                placeholder="Ex: Nas terças o Dr. chega às 9h. Nas sextas encerra às 17h."></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hdr">
+            <div class="card-hdr-l"><span class="card-icon">🚫</span><span class="card-title">Filtros Especiais de
+                Agendamento</span></div>
+          </div>
+          <div class="card-grid">
+            <div class="field"><label>Idade mínima para atender</label><input id="idade_minima" type="text"
+                placeholder="Ex: 14 anos — abaixo disso, encerrar com gentileza">
+              <div class="hint">Deixe vazio se não há restrição.</div>
+            </div>
+            <div class="field"><label>Bloqueio por consulta recente</label><input id="bloqueio_recente" type="text"
+                placeholder="Ex: não agendar se já tem consulta nos próximos 15 dias">
+              <div class="hint">Deixe vazio se não há restrição.</div>
+            </div>
+            <div class="field full">
+              <label>Campanha ou Requisito Especial</label>
+              <div style="display:flex; align-items:center; gap:12px; margin-top:6px;">
+                <label class="chk-row" style="padding:0; white-space:nowrap;">
+                  <input type="checkbox" id="campanha_chk" onchange="toggleCampanha()">
+                  <span class="chk-label">Sim, há campanha</span>
+                </label>
+                <div id="campanha_wrap" style="display:none; flex:1;">
+                  <input id="campanha_especial" type="text" placeholder="Ex: Paciente traz 1kg de alimento não perecível como ação solidária">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ 3. HABILIDADES ══ -->
+      <section class="sec" id="sec-habilidades" data-label="Capacidades">
+        <div class="sec-head">
+          <h2><span class="sec-num">03</span> Capacidades do Agente</h2>
+          <p class="sec-desc">Visão geral das funcionalidades nativas que o agente de IA já possui por padrão (não
+            requerem configuração).</p>
+        </div>
+        <div class="sec-divider"></div>
+
+        <div class="card-grid g3">
+          <div class="info-box"
+            style="margin-bottom:0; background: var(--sur); border-color: var(--bdr); color: var(--tx);">
+            <div style="font-size:24px; margin-bottom:8px;">📅</div>
+            <strong style="display:block; margin-bottom:4px; font-size:13px;">Agendamento Autônomo</strong>
+            <span style="font-size:12px; color:var(--tm); line-height:1.4;">Consulta a agenda, remarca e cancela
+              consultas de forma 100% autônoma.</span>
+          </div>
+          <div class="info-box"
+            style="margin-bottom:0; background: var(--sur); border-color: var(--bdr); color: var(--tx);">
+            <div style="font-size:24px; margin-bottom:8px;">🧠</div>
+            <strong style="display:block; margin-bottom:4px; font-size:13px;">Memória Contextual</strong>
+            <span style="font-size:12px; color:var(--tm); line-height:1.4;">Lembra de conversas passadas e retoma o
+              atendimento de onde parou.</span>
+          </div>
+          <div class="info-box"
+            style="margin-bottom:0; background: var(--sur); border-color: var(--bdr); color: var(--tx);">
+            <div style="font-size:24px; margin-bottom:8px;">🏷️</div>
+            <strong style="display:block; margin-bottom:4px; font-size:13px;">Classificação de Leads</strong>
+            <span style="font-size:12px; color:var(--tm); line-height:1.4;">Aplica tags no CRM para dor estética,
+              funcional ou nível de urgência.</span>
+          </div>
+          <div class="info-box"
+            style="margin-bottom:0; background: var(--sur); border-color: var(--bdr); color: var(--tx);">
+            <div style="font-size:24px; margin-bottom:8px;">🤝</div>
+            <strong style="display:block; margin-bottom:4px; font-size:13px;">Pacto de Honra</strong>
+            <span style="font-size:12px; color:var(--tm); line-height:1.4;">Extrai o comprometimento verbal do paciente
+              antes de finalizar a marcação.</span>
+          </div>
+          <div class="info-box"
+            style="margin-bottom:0; background: var(--sur); border-color: var(--bdr); color: var(--tx);">
+            <div style="font-size:24px; margin-bottom:8px;">🙋‍♀️</div>
+            <strong style="display:block; margin-bottom:4px; font-size:13px;">Transbordo Inteligente</strong>
+            <span style="font-size:12px; color:var(--tm); line-height:1.4;">Passa o atendimento para a equipe humana em
+              casos complexos ou solicitação.</span>
+          </div>
+          <div class="info-box"
+            style="margin-bottom:0; background: var(--sur); border-color: var(--bdr); color: var(--tx);">
+            <div style="font-size:24px; margin-bottom:8px;">🔄</div>
+            <strong style="display:block; margin-bottom:4px; font-size:13px;">Reengajamento</strong>
+            <span style="font-size:12px; color:var(--tm); line-height:1.4;">Tenta reativar leads que pararam de
+              responder após algumas horas.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ 4. TAGS ══ -->
+      <section class="sec" id="sec-tags" data-label="Tags">
+        <div class="sec-head">
+          <h2><span class="sec-num">04</span> Tags do Sistema</h2>
+          <p class="sec-desc">Etiquetas aplicadas ao contato no CRM de forma automática para alimentar automações e
+            segmentações.</p>
+        </div>
+        <div class="sec-divider"></div>
+
+        <div class="card-grid g3">
+          <div class="info-box"
+            style="margin-bottom:0; background: var(--sur); border-color: var(--bdr); color: var(--tx);">
+            <div style="font-size:24px; margin-bottom:8px;">✅</div>
+            <strong style="display:block; margin-bottom:4px; font-size:13px;">Conversão Concluída</strong>
+            <span style="font-size:12px; color:var(--tm); line-height:1.4;">"Cliente Agendou - IA". Identifica que o
+              lead foi convertido pelo agente.</span>
+          </div>
+          <div class="info-box"
+            style="margin-bottom:0; background: var(--sur); border-color: var(--bdr); color: var(--tx);">
+            <div style="font-size:24px; margin-bottom:8px;">✨</div>
+            <strong style="display:block; margin-bottom:4px; font-size:13px;">Dor Estética</strong>
+            <span style="font-size:12px; color:var(--tm); line-height:1.4;">"Marcar_Dor_Estetica". Para pacientes com
+              vergonha de sorrir ou incômodos visuais.</span>
+          </div>
+          <div class="info-box"
+            style="margin-bottom:0; background: var(--sur); border-color: var(--bdr); color: var(--tx);">
+            <div style="font-size:24px; margin-bottom:8px;">🦷</div>
+            <strong style="display:block; margin-bottom:4px; font-size:13px;">Dor Funcional</strong>
+            <span style="font-size:12px; color:var(--tm); line-height:1.4;">"Marcar_Dor_Mastigacao". Para pacientes com
+              dificuldade de mastigar ou dores.</span>
+          </div>
+          <div class="info-box"
+            style="margin-bottom:0; background: var(--sur); border-color: var(--bdr); color: var(--tx);">
+            <div style="font-size:24px; margin-bottom:8px;">🚨</div>
+            <strong style="display:block; margin-bottom:4px; font-size:13px;">Urgência Alta</strong>
+            <span style="font-size:12px; color:var(--tm); line-height:1.4;">"Classificar_Urgencia_Alta". Destaca casos
+              de dor constante para a equipe humana.</span>
+          </div>
+          <div class="info-box"
+            style="margin-bottom:0; background: var(--sur); border-color: var(--bdr); color: var(--tx);">
+            <div style="font-size:24px; margin-bottom:8px;">🟢</div>
+            <strong style="display:block; margin-bottom:4px; font-size:13px;">Urgência Baixa</strong>
+            <span style="font-size:12px; color:var(--tm); line-height:1.4;">"Classificar_Urgencia_Baixa". Para casos sem
+              dor aguda, com foco estético.</span>
+          </div>
+          <div class="info-box"
+            style="margin-bottom:0; background: var(--sur); border-color: var(--bdr); color: var(--tx);">
+            <div style="font-size:24px; margin-bottom:8px;">❄️</div>
+            <strong style="display:block; margin-bottom:4px; font-size:13px;">Lead Esfriando</strong>
+            <span style="font-size:12px; color:var(--tm); line-height:1.4;">Aplicada pelo fluxo após horas de silêncio
+              para ativar a mensagem de reengajamento.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ 5. BANCO DE CONHECIMENTO ══ -->
+      <section class="sec" id="sec-banco" data-label="Banco de Conhecimento">
+        <div class="sec-head">
+          <h2><span class="sec-num">05</span> Banco de Conhecimento</h2>
+          <p class="sec-desc">Informações que o agente consulta para responder perguntas. Ele nunca improvisa — só
+            responde com o que estiver aqui.</p>
+        </div>
+        <div class="sec-divider"></div>
+
+        <div class="card">
+          <div class="card-hdr">
+            <div class="card-hdr-l"><span class="card-icon">📍</span><span class="card-title">Localização</span></div>
+            <button class="btn btn-def btn-sm" onclick="fillDefault('localizacao')">↓ Exemplo: Volta a Sorrir</button>
+          </div>
+          <div class="card-grid">
+            <div class="field full"><label>Endereço completo</label><input id="bk_endereco" type="text"
+                placeholder="Rua, número, bairro — Cidade/UF"></div>
+            <div class="field full"><label>Referência de localização</label><input id="bk_referencia" type="text"
+                placeholder="Ex: Após passar a ponte, antes do Banco do Brasil">
+              <div class="hint">Como guiar quem não conhece o bairro.</div>
+            </div>
+            <div class="field"><label>Link Google Maps</label><input id="bk_maps" type="text"
+                placeholder="https://maps.app.goo.gl/..."></div>
+            <div class="field"><label>Obs de localização</label><input id="bk_loc_obs" type="text"
+                placeholder="Ex: Estacionamento gratuito na rua"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hdr">
+            <div class="card-hdr-l"><span class="card-icon">🏥</span><span class="card-title">Estrutura e
+                Diferenciais</span></div>
+            <button class="btn btn-def btn-sm" onclick="fillDefault('estrutura')">↓ Exemplo: Volta a Sorrir</button>
+          </div>
+          <div class="field">
+            <label>Texto para o banco de conhecimento</label>
+            <textarea id="bk_estrutura" style="min-height:130px"
+              placeholder="Descreva os diferenciais, tecnologias, abordagem de atendimento e o que torna essa clínica especial..."></textarea>
+            <div class="hint">Consultado ao responder "o que vocês fazem de diferente?" ou "por que escolher vocês?"
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hdr">
+            <div class="card-hdr-l"><span class="card-icon">💬</span><span class="card-title">Resposta Padrão — Pergunta
+                de Preço</span></div>
+            <button class="btn btn-def btn-sm" onclick="fillDefault('preco')">↓ Exemplo: Volta a Sorrir</button>
+          </div>
+          <div class="field">
+            <label>Como o agente responde quando o paciente pergunta o preço?</label>
+            <textarea id="bk_preco" style="min-height:90px"
+              placeholder="Ex: O valor é personalizado porque depende da sua avaliação clínica 😊..."></textarea>
+            <div class="hint">⚠️ O agente nunca informa valores em reais. Esta resposta redireciona para a avaliação.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ 6. OBJEÇÕES ══ -->
+      <section class="sec" id="sec-objecoes" data-label="Objeções">
+        <div class="sec-head">
+          <h2><span class="sec-num">06</span> Objeções Customizadas</h2>
+          <p class="sec-desc">Para cada resistência do paciente, o agente consulta este banco — nunca improvisa.
+            Configure os gatilhos e a resposta ideal para esta clínica.</p>
+        </div>
+        <div class="sec-divider"></div>
+        <div class="info-box">Use <strong>"↓ Exemplo: Volta a Sorrir"</strong> em cada objeção para ver como a clínica
+          referência trata aquela situação. Adapte para o contexto desta clínica.</div>
+        <div id="objecoesCards"></div>
+        <button class="btn btn-ghost" style="margin-top:4px" onclick="addObjecao()">+ Adicionar objeção</button>
+      </section>
+
+      <!-- ══ 7. REGRAS ══ -->
+      <section class="sec" id="sec-regras" data-label="Regras">
+        <div class="sec-head">
+          <h2><span class="sec-num">07</span> Regras e Comportamento</h2>
+          <p class="sec-desc">Ajustes finos de como o agente deve se comportar em situações específicas desta clínica.
+          </p>
+        </div>
+        <div class="sec-divider"></div>
+
+        <div class="card">
+          <div class="card-hdr">
+            <div class="card-hdr-l"><span class="card-icon">🗣️</span><span class="card-title">Identidade e Tom</span>
+            </div>
+            <button class="btn btn-def btn-sm" onclick="fillDefault('regras_tom')">↓ Exemplo: Volta a Sorrir</button>
+          </div>
+          <div class="card-grid">
+            <div class="field full"><label>Resposta ao "você é um robô?"</label><textarea id="resp_robo"
+                style="min-height:70px"
+                placeholder='Ex: Sou a assistente da clínica falando com você em tempo real! 🙋‍♀️'></textarea></div>
+            <div class="field full"><label>Frase de transbordo para humano</label><textarea id="resp_transbordo"
+                style="min-height:70px"
+                placeholder='Ex: Vou chamar a Morgana aqui para te ajudar, tudo bem? 😊'></textarea></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hdr">
+            <div class="card-hdr-l"><span class="card-icon">⚙️</span><span class="card-title">Configurações
+                Técnicas</span></div>
+            <button class="btn btn-def btn-sm" onclick="fillDefault('regras_tec')">↓ Exemplo: Volta a Sorrir</button>
+          </div>
+          <div class="card-grid">
+            <div class="field"><label>Fuso horário</label>
+              <select id="fuso_horario">
+                <option value="Brasilia">Brasília (GMT-3)</option>
+                <option value="Manaus">Manaus (GMT-4)</option>
+                <option value="Acre">Acre (GMT-5)</option>
+                <option value="Fernando de Noronha">Fernando de Noronha (GMT-2)</option>
+              </select>
+              <div class="hint">Importante para clínicas no Amazonas, Acre e Fernando de Noronha.</div>
+            </div>
+            <div class="field"><label>Limite de caracteres por mensagem</label>
+              <select id="limite_chars">
+                <option value="120">120 caracteres (padrão WhatsApp ágil)</option>
+                <option value="200">200 caracteres</option>
+                <option value="livre">Sem limite rígido</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hdr">
+            <div class="card-hdr-l"><span class="card-icon">📋</span><span class="card-title">Dados Coletados no
+                Agendamento</span></div>
+            <button class="btn btn-def btn-sm" onclick="fillDefault('dados')">↓ Exemplo: Volta a Sorrir</button>
+          </div>
+          <div class="info-box" style="margin-bottom:14px">O telefone não é coletado durante o agendamento — já vem pelo
+            WhatsApp. Ele só é solicitado ao remarcar, cancelar ou verificar consultas.</div>
+          <div class="field">
+            <label>Campos obrigatórios para realizar_agendamento</label>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+              <label class="chk-row"><input type="checkbox" id="campo_nome" checked disabled><span
+                  class="chk-label">Nome Completo</span><span class="chk-note">(sempre obrigatório)</span></label>
+              <label class="chk-row"><input type="checkbox" id="campo_nascimento" checked><span class="chk-label">Data
+                  de Nascimento</span></label>
+              <label class="chk-row"><input type="checkbox" id="campo_telefone" checked><span
+                  class="chk-label">Telefone</span></label>
+              <label class="chk-row"><input type="checkbox" id="campo_bairro"><span class="chk-label">Bairro</span><span
+                  class="chk-note">(ex: Instituto Prime usa bairro em vez de telefone)</span></label>
+            </div>
+          </div>
+          <div class="field" style="margin-top:14px"><label>Observações sobre coleta</label><input id="dados_obs"
+              type="text" placeholder="Ex: O telefone é confirmado apenas no Pacto de Honra"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-hdr">
+            <div class="card-hdr-l"><span class="card-icon">📝</span><span class="card-title">Notas Adicionais</span>
+            </div>
+          </div>
+          <div class="field">
+            <label>Informações que não se encaixaram nas seções anteriores</label>
+            <textarea id="notas_adicionais" style="min-height:100px"
+              placeholder="Ex: O agente nunca menciona o sócio X. Na segunda-feira o Dr. chega às 14h. Pacientes de outras cidades têm desconto especial..."></textarea>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ 8. EXPORTAR ══ -->
+      <section class="sec" id="sec-exportar" data-label="Exportar">
+        <div class="sec-head">
+          <h2><span class="sec-num">08</span> Exportar Briefing</h2>
+          <p class="sec-desc">Prévia do documento gerado com todas as informações preenchidas.</p>
+        </div>
+        <div class="sec-divider"></div>
+        <div class="export-pre" id="exportPreview">Clique em "Gerar Prévia" para visualizar o documento...</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-ghost" onclick="buildPreview()">⟳ Gerar Prévia</button>
+          <button class="btn btn-dark" onclick="exportMD()">⬇ Baixar .md</button>
+          <button class="btn btn-primary" onclick="exportPDF()">⬇ Baixar PDF</button>
+        </div>
+      </section>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ─── SECTIONS ───────────────────────────────────────────
+    const SECS = [
+      { id: 'identidade', name: 'Identidade', sub: 'Agente, clínica, dentista' },
+      { id: 'agenda', name: 'Agenda e Horários', sub: 'Dias, almoço, slots' },
+      { id: 'habilidades', name: 'Capacidades', sub: 'Visão geral do agente' },
+      { id: 'tags', name: 'Tags do Sistema', sub: 'Etiquetas no CRM' },
+      { id: 'banco', name: 'Banco de Conhecimento', sub: 'Localização, estrutura' },
+      { id: 'objecoes', name: 'Objeções', sub: 'Respostas a resistências' },
+      { id: 'regras', name: 'Regras e Comportamento', sub: 'Filtros e ajustes' },
+      { id: 'exportar', name: 'Exportar Briefing', sub: 'Baixar .md final' },
+    ];
+
+    // ─── BUILD SIDEBAR ──────────────────────────────────────
+    function buildSidebar() {
+      document.getElementById('sbNav').innerHTML = SECS.map((s, i) => `
+    <div class="sn" id="sn-${i}" onclick="scrollTo('sec-${s.id}')">
+      <div class="sn-num">${String(i + 1).padStart(2, '0')}</div>
+      <div class="sn-info">
+        <div class="sn-name">${s.name}</div>
+        <div class="sn-sub">${s.sub}</div>
+      </div>
+    </div>`).join('');
+    }
+
+    function scrollTo(id) {
+      document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // ─── SCROLL SPY ─────────────────────────────────────────
+    const mainEl = document.getElementById('mainScroll');
+    mainEl.addEventListener('scroll', () => {
+      const scrollTop = mainEl.scrollTop + 100;
+      let active = 0;
+      SECS.forEach((s, i) => {
+        const el = document.getElementById('sec-' + s.id);
+        if (el && el.offsetTop <= scrollTop) active = i;
+      });
+      SECS.forEach((_, i) => {
+        document.getElementById('sn-' + i)?.classList.toggle('active', i === active);
+      });
+      document.getElementById('topCrumb').textContent = SECS[active].name;
+    });
+
+    // ─── AGENDA ─────────────────────────────────────────────
+    const DAYS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+    const DAY_DEF = [
+      { on: true, i: '08:00', f: '19:00' }, { on: true, i: '08:00', f: '19:00' },
+      { on: true, i: '08:00', f: '19:00' }, { on: true, i: '08:00', f: '19:00' },
+      { on: true, i: '08:00', f: '19:00' }, { on: false, i: '', f: '' }, { on: false, i: '', f: '' },
+    ];
+
+    function buildAgenda() {
+      document.getElementById('agendaBody').innerHTML = DAYS.map((d, i) => {
+        const def = DAY_DEF[i];
+        return `<tr>
+      <td><input type="checkbox" id="day_on_${i}" ${def.on ? 'checked' : ''} onchange="toggleDay(${i})"></td>
+      <td><span class="day-name${def.on ? '' : ' day-off'}" id="day_nm_${i}">${d}</span></td>
+      <td><input type="time" id="day_ini_${i}" value="${def.i}" ${def.on ? '' : 'disabled'}></td>
+      <td><span class="time-sep">—</span></td>
+      <td><input type="time" id="day_fim_${i}" value="${def.f}" ${def.on ? '' : 'disabled'}></td>
+    </tr>`;
+      }).join('');
+    }
+
+    function toggleDay(i) {
+      const on = document.getElementById('day_on_' + i).checked;
+      document.getElementById('day_nm_' + i).className = 'day-name' + (on ? '' : ' day-off');
+      document.getElementById('day_ini_' + i).disabled = !on;
+      document.getElementById('day_fim_' + i).disabled = !on;
+      if (!on) { document.getElementById('day_ini_' + i).value = ''; document.getElementById('day_fim_' + i).value = ''; }
+    }
+
+    function toggleAlmoco() {
+      const on = document.getElementById('tem_almoco').checked;
+      document.getElementById('almoco_wrap').style.display = on ? 'block' : 'none';
+    }
+
+    function toggleCampanha() {
+      const on = document.getElementById('campanha_chk').checked;
+      document.getElementById('campanha_wrap').style.display = on ? 'flex' : 'none';
+      if (!on) document.getElementById('campanha_especial').value = '';
+    }
+
+    function toggleEspOutros() {
+      const on = document.getElementById('esp_outros_chk').checked;
+      document.getElementById('esp_outros_wrap').style.display = on ? 'block' : 'none';
+    }
+
+
+
+    // ─── OBJEÇÕES ────────────────────────────────────────────
+    const OBJ_VAS = [
+      {
+        t: 'Preço / Não tenho condições', g: 'é caro, não tenho condições, não posso pagar, acima do meu orçamento, não tenho dinheiro',
+        r: 'Entendo essa preocupação, e ela faz todo sentido 💙\nQual o valor de você voltar a sorrir e ter seus relacionamentos restaurados?\nE o primeiro passo — a avaliação — é completamente gratuito. Você só vem conversar com o Dr. Matheus, sem compromisso nenhum.'
+      },
+      {
+        t: 'Medo / Trauma de dentista', g: 'tenho medo, dói, tive experiência ruim, medo de cirurgia, medo de dentista',
+        r: 'Esse medo é muito mais comum do que parece — e o Dr. Matheus entende isso muito bem 😊\nVocê conhece o comprimido da coragem?\nMuitos pacientes chegam aqui tremendo e saem surpresos com a tranquilidade de tudo. Na avaliação, ele explica cada detalhe para você se sentir seguro antes de qualquer decisão.'
+      },
+      {
+        t: 'Idade / "Sou muito velho"', g: 'sou muito velho, minha idade não permite, já estou idoso, com minha idade não adianta',
+        r: 'Posso te dizer uma coisa? 🥰\nQuanto custa um dia de muita alegria e bons relacionamentos?\nA idade sozinha raramente é um impedimento — o que importa é a saúde geral, e isso avaliamos na consulta. Já tratamos pacientes de muitas idades diferentes.'
+      },
+      {
+        t: 'Pergunta direta de preço', g: 'qual o preço, quanto custa, me fala o valor, qual o orçamento, tem como me dizer o preço',
+        r: 'O valor é personalizado porque depende do seu caso específico 😊\nMas posso te garantir que o primeiro passo — a avaliação — é totalmente gratuito.\nVocê vem, o Dr. Matheus avalia, e aí a gente te apresenta as opções com calma. Posso agendar?'
+      },
+      {
+        t: 'Distância / "Fica longe"', g: 'fica longe, é muita distância, fica do outro lado da cidade, muito longe, não consigo ir',
+        r: 'Entendo! 💙\nMas deixa eu te perguntar: qual a distância entre o seu melhor sorriso e seus relacionamentos restaurados — e a distância até a nossa clínica?\nMuitos pacientes vêm de cidades vizinhas exatamente porque sabem que vale cada quilômetro.'
+      },
+      {
+        t: 'Adaptação / "Me viro com dentadura"', g: 'me viro com dentadura, estou acostumado, não preciso de implante, dentadura resolve',
+        r: 'Entendo que você se adaptou 😊\nMas me conta uma coisa: tem alguma situação no dia a dia em que ainda te incomoda? Comer alguma coisa, sorrir em foto?\nA avaliação é gratuita e sem compromisso — você só vem conversar e ver as opções que existem hoje.'
+      },
+      {
+        t: 'Indecisão / "Vou pensar"', g: 'vou pensar, depois eu marco, preciso de tempo, não estou decidido, vou ver',
+        r: 'Entendo que você precisa de tempo para pensar 😊\nSó que casos como o seu tendem a complicar com o tempo — e aí a solução fica mais trabalhosa.\nPosso reservar uma data mais tranquila para você, sem pressa. Qual período ficaria melhor?'
+      },
+    ];
+
+    let objecoesData = OBJ_VAS.map(o => ({ ...o }));
+
+    function buildObjecoes() {
+      document.getElementById('objecoesCards').innerHTML = objecoesData.map((o, i) => `
+    <div class="obj" id="obj-${i}">
+      <div class="obj-hdr" onclick="toggleObj(${i})">
+        <div class="obj-idx">${i + 1}</div>
+        <div class="obj-title-text" id="obj_title_display_${i}">${o.t}</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-def btn-sm" onclick="event.stopPropagation();fillObjDefault(${i})">↓ Exemplo</button>
+          <div class="obj-chev">▼</div>
+        </div>
+      </div>
+      <div class="obj-body">
+        <div class="card-grid" style="gap:12px;margin-top:4px">
+          <div class="field full"><label>Título da objeção</label>
+            <input type="text" id="obj_t_${i}" value="${esc(o.t)}" placeholder="Nome descritivo" oninput="document.getElementById('obj_title_display_${i}').textContent=this.value">
+          </div>
+          <div class="field full"><label>Palavras-chave de ativação</label>
+            <input type="text" id="obj_g_${i}" value="${esc(o.g)}" placeholder="Ex: é caro, não tenho dinheiro">
+            <div class="hint">Separe por vírgula. O agente reconhece variações dessas palavras.</div>
+          </div>
+          <div class="field full"><label>Resposta da clínica</label>
+            <textarea id="obj_r_${i}" style="min-height:110px">${esc(o.r)}</textarea>
+            <div class="hint">Esta resposta será usada como base pelo agente. Adapte ao tom desta clínica.</div>
+          </div>
+        </div>
+      </div>
+    </div>`).join('');
+    }
+
+    function esc(s) { return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+    function toggleObj(i) {
+      document.getElementById('obj-' + i).classList.toggle('open');
+    }
+
+    function fillObjDefault(i) {
+      if (i < OBJ_VAS.length) {
+        const o = OBJ_VAS[i];
+        document.getElementById('obj_t_' + i).value = o.t;
+        document.getElementById('obj_g_' + i).value = o.g;
+        document.getElementById('obj_r_' + i).value = o.r;
+        document.getElementById('obj_title_display_' + i).textContent = o.t;
+        toast('Exemplo da Volta a Sorrir aplicado 🟠');
+      }
+    }
+
+    function addObjecao() {
+      objecoesData.push({ t: 'Nova Objeção', g: '', r: '' });
+      buildObjecoes();
+      const i = objecoesData.length - 1;
+      document.getElementById('obj-' + i).classList.add('open');
+      document.getElementById('obj-' + i).scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // ─── DEFAULTS ────────────────────────────────────────────
+    const VAS = {
+      identidade: { agente_nome: 'Morgana', agente_cargo: 'Secretária Virtual e SDR', clinica_nome: 'Volta a Sorrir', dentista_nome: 'Dr. Matheus', cidade_estado: 'Tubarão — SC', telefone_clinica: '(62) 99315-7227', redes_sociais: '@volteasorrirtubarao', anos_experiencia: '15 anos', esp_implantes: true, esp_lentes: true, publico_alvo: 'Homens e mulheres entre 40 e 70 anos, residentes em Tubarão, Amurel e região sul de SC. Pessoas que perderam dentes, usuários de dentadura com insegurança ou dificuldade de mastigar, e quem busca transformação estética do sorriso.' },
+      transbordo: { transbordo_para: 'a Morgana', avaliacao_termo: 'gratuita' },
+      pagamento: { convenios_aceita: 'sim', convenios_quais: 'Vida Cotidiana, PAFT', pagamento: 'Cartão de crédito até 18x, débito, PIX, boleto e dinheiro. PIX e dinheiro: 5% de desconto.' },
+      localizacao: { bk_endereco: 'Rua da Rodoviária Nova — Tubarão/SC', bk_referencia: 'Após passar a ponte, antes do Banco do Brasil', bk_maps: 'https://maps.app.goo.gl/9iLARRLBrSWpNYmD6', bk_loc_obs: '' },
+      estrutura: { bk_estrutura: 'A Volta a Sorrir é especializada em reabilitação oral e estética dental, com mais de 15 anos de atuação em Tubarão/SC.\n\n• Protocolo Cerâmico e Acrílico — prótese fixa sobre implantes para quem perdeu todos ou a maioria dos dentes.\n• Implantes Unitários — reposição de dentes perdidos com naturalidade e função.\n• Lentes de Contato Cerâmica — transformação estética sem desgaste excessivo.\n\nDiferenciais: tecnologia de ponta, atendimento humanizado, somente por agendamento prévio. Avaliação gratuita com o Dr. Matheus.' },
+      preco: { bk_preco: 'O valor é personalizado porque depende da sua avaliação clínica 😊\nMas posso te garantir que o primeiro passo — a avaliação — é totalmente gratuito.\nVocê vem, o Dr. Matheus avalia, e aí a gente te apresenta as opções com calma.' },
+      regras_tom: { resp_robo: 'Sou a assistente da clínica falando com você em tempo real! 🙋‍♀️', resp_transbordo: 'Vou chamar a Morgana aqui para te ajudar, tudo bem? 😊' },
+      regras_tec: { fuso_horario: 'Brasilia', limite_chars: '120' },
+      dados: { campo_nascimento: true, campo_telefone: true, campo_bairro: false, dados_obs: 'O telefone já vem pelo WhatsApp. Ele só é coletado ao remarcar, cancelar ou verificar consultas.' },
+    };
+
+    function fillDefault(key) {
+      const d = VAS[key];
+      if (!d) return;
+      Object.entries(d).forEach(([k, v]) => {
+        const el = document.getElementById(k);
+        if (!el) return;
+        if (el.type === 'checkbox') el.checked = !!v;
+        else if (el.tagName === 'SELECT') { el.value = v; el.dispatchEvent(new Event('change')); }
+        else el.value = v;
+      });
+      // side effects
+      if (key === 'pagamento' && d.convenios_aceita === 'sim') toggleConvenios();
+      toast('Exemplo da Volta a Sorrir aplicado 🟠');
+    }
+
+    function toggleConvenios() {
+      const val = document.getElementById('convenios_aceita').value;
+      document.getElementById('convenios_quais_wrap').style.display = val === 'sim' ? 'flex' : 'none';
+    }
+
+    document.getElementById('avaliacao_termo').addEventListener('change', function () {
+      document.getElementById('avaliacao_custom_wrap').style.display = this.value === 'outro' ? 'block' : 'none';
+    });
+
+    function toggleEspOutros() {
+      const on = document.getElementById('esp_outros_chk').checked;
+      document.getElementById('esp_outros_wrap').style.display = on ? 'block' : 'none';
+    }
+
+    // ─── PROGRESS ────────────────────────────────────────────
+    const TRACKED = ['agente_nome', 'agente_cargo', 'clinica_nome', 'dentista_nome', 'transbordo_para', 'bk_endereco', 'bk_estrutura', 'bk_preco', 'resp_robo'];
+    function updateProgress() {
+      const filled = TRACKED.filter(id => { const el = document.getElementById(id); return el && el.value.trim().length > 0; }).length;
+      const pct = Math.round((filled / TRACKED.length) * 100);
+      document.getElementById('pgFill').style.width = pct + '%';
+      document.getElementById('pgPct').textContent = pct + '%';
+    }
+    document.getElementById('mainScroll').addEventListener('input', updateProgress);
+
+    // ─── EXPORT ──────────────────────────────────────────────
+    function g(id) { return (document.getElementById(id) || {}).value || ''; }
+    function gc(id) { return !!(document.getElementById(id) || {}).checked; }
+
+    function buildPreview() {
+      document.getElementById('exportPreview').textContent = generateMD();
+      document.getElementById('sec-exportar').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function generateMD() {
+      const now = new Date().toLocaleDateString('pt-BR');
+      let md = `# BRIEFING DO AGENTE IA\n## ${g('clinica_nome') || '[Clínica]'} — Reunião de Onboarding\nData: ${now}\n\n---\n\n`;
+
+      md += `## 1. IDENTIDADE\n\n`;
+      md += `- **Nome do Agente:** ${g('agente_nome')}\n`;
+      md += `- **Cargo:** ${g('agente_cargo')}\n`;
+      md += `- **Clínica:** ${g('clinica_nome')}\n`;
+      md += `- **Dentista / Responsável:** ${g('dentista_nome')}\n`;
+      md += `- **Transbordo para:** ${g('transbordo_para')}\n`;
+      md += `- **Cidade / Estado:** ${g('cidade_estado')}\n`;
+      md += `- **Experiência:** ${g('anos_experiencia')}\n`;
+      md += `- **Redes Sociais:** ${g('redes_sociais')}\n`;
+      md += `- **Telefone:** ${g('telefone_clinica')}\n`;
+      const av = g('avaliacao_termo'); md += `- **Avaliação:** ${av === 'outro' ? g('avaliacao_custom') : av}\n`;
+      md += `- **Convênios:** ${g('convenios_aceita') === 'sim' ? g('convenios_quais') : 'Não aceita — exclusivamente particular'}\n`;
+      md += `- **Pagamento:** ${g('pagamento')}\n`;
+      const espList = Array.from(document.querySelectorAll('.esp-chk:checked')).map(cb => cb.value);
+      if (gc('esp_outros_chk') && g('esp_outros_text')) {
+        espList.push(g('esp_outros_text'));
+      }
+      md += `\n**Especialidades:**\n${espList.length > 0 ? espList.join(', ') : 'Nenhuma selecionada'}\n`;
+      md += `\n**Público-alvo:**\n${g('publico_alvo')}\n`;
+
+      md += `\n---\n\n## 2. AGENDA\n\n`;
+      if (g('sistema_agenda')) md += `- **Sistema de Agenda:** ${g('sistema_agenda')}\n`;
+      md += `| Dia | Ativo | Abre | Fecha |\n|-----|-------|------|-------|\n`;
+      DAYS.forEach((d, i) => {
+        const on = gc('day_on_' + i), ini = g('day_ini_' + i) || '—', fim = g('day_fim_' + i) || '—';
+        md += `| ${d} | ${on ? '✅' : '❌'} | ${on ? ini : 'Fechado'} | ${on ? fim : ''} |\n`;
+      });
+      md += `\n- **Almoço:** ${gc('tem_almoco') ? `${g('almoco_ini')} às ${g('almoco_fim')}` : 'Não fecha para almoço'}\n`;
+      md += `- **Duração da avaliação:** ${g('consulta_duracao')} minutos\n`;
+      md += `- **Pacientes por horário:** ${g('pacientes_por_horario')}\n`;
+      md += `- **Encaixes:** ${g('aceita_encaixes') === 'emergencia' ? 'Somente emergências' : g('aceita_encaixes') === 'nao' ? 'Não aceita' : 'Sim'}\n`;
+      if (g('agenda_obs')) md += `- **Obs:** ${g('agenda_obs')}\n`;
+      if (g('idade_minima')) md += `- **Idade mínima:** ${g('idade_minima')}\n`;
+      if (g('bloqueio_recente')) md += `- **Bloqueio por consulta recente:** ${g('bloqueio_recente')}\n`;
+      if (g('campanha_especial')) md += `- **Campanha especial:** ${g('campanha_especial')}\n`;
+
+      md += `\n---\n\n## 3. BANCO DE CONHECIMENTO — LOCALIZAÇÃO\n\n`;
+      md += `- **Endereço:** ${g('bk_endereco')}\n- **Referência:** ${g('bk_referencia')}\n- **Maps:** ${g('bk_maps')}\n`;
+      if (g('bk_loc_obs')) md += `- **Obs:** ${g('bk_loc_obs')}\n`;
+
+      md += `\n---\n\n## 4. BANCO DE CONHECIMENTO — ESTRUTURA E DIFERENCIAIS\n\n${g('bk_estrutura')}\n`;
+      md += `\n---\n\n## 5. RESPOSTA PADRÃO — PERGUNTA DE PREÇO\n\n${g('bk_preco')}\n`;
+
+      md += `\n---\n\n## 6. OBJEÇÕES\n\n`;
+      document.querySelectorAll('[id^="obj_t_"]').forEach((_, i) => {
+        const t = g('obj_t_' + i), gt = g('obj_g_' + i), r = g('obj_r_' + i);
+        if (t || r) md += `### Objeção ${i + 1} — ${t}\n**Gatilhos:** ${gt}\n\n**Resposta:**\n${r}\n\n`;
+      });
+
+      md += `---\n\n## 7. REGRAS E COMPORTAMENTO\n\n`;
+      md += `- **Fuso horário:** ${g('fuso_horario')}\n`;
+      md += `- **Limite por mensagem:** ${g('limite_chars')} caracteres\n`;
+      md += `- **Resposta ao "você é robô?":** ${g('resp_robo')}\n`;
+      md += `- **Frase de transbordo:** ${g('resp_transbordo')}\n`;
+      const campos = [];
+      if (gc('campo_nome')) campos.push('Nome Completo');
+      if (gc('campo_nascimento')) campos.push('Data de Nascimento');
+      if (gc('campo_telefone')) campos.push('Telefone');
+      if (gc('campo_bairro')) campos.push('Bairro');
+      md += `- **Dados para realizar_agendamento:** ${campos.join(', ')}\n`;
+      if (g('dados_obs')) md += `- **Obs dados:** ${g('dados_obs')}\n`;
+      if (g('notas_adicionais')) md += `\n**Notas adicionais:**\n${g('notas_adicionais')}\n`;
+
+      md += `\n---\n\n## 8. CAPACIDADES DO AGENTE (Nativas)\n\n`;
+      md += `- Agendamento Autônomo\n- Memória Contextual\n- Classificação de Leads\n- Pacto de Honra\n- Transbordo Inteligente\n- Reengajamento\n\n`;
+
+      md += `---\n\n## 9. TAGS DO SISTEMA (Nativas)\n\n`;
+      md += `- Cliente Agendou - IA\n- Marcar_Dor_Estetica\n- Marcar_Dor_Mastigacao\n- Classificar_Urgencia_Alta\n- Classificar_Urgencia_Baixa\n- Lead Esfriando\n\n`;
+
+      return md;
+    }
+
+    function exportMD() {
+      const clinica = (g('clinica_nome') || 'clinica').toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+      const blob = new Blob([generateMD()], { type: 'text/markdown;charset=utf-8' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `briefing_${clinica}.md`; a.click();
+      toast('Arquivo .md baixado com sucesso ✅');
+    }
+
+    function exportPDF() {
+      const clinica = g('clinica_nome') || 'Briefing';
+      const md = generateMD();
+      const lines = md.split('\n');
+
+      // Markdown -> HTML converter
+      let body = '';
+      let inList = false, inTable = false, tableHasHeader = false;
+      lines.forEach(line => {
+        if (line.startsWith('# ')) {
+          if (inList) { body += '</ul>'; inList = false; }
+          body += `<h1>${line.slice(2)}</h1>`;
+        } else if (line.startsWith('## ')) {
+          if (inList) { body += '</ul>'; inList = false; }
+          body += `<h2>${line.slice(3)}</h2>`;
+        } else if (line.startsWith('### ')) {
+          if (inList) { body += '</ul>'; inList = false; }
+          body += `<h3>${line.slice(4)}</h3>`;
+        } else if (line.startsWith('---')) {
+          if (inList) { body += '</ul>'; inList = false; }
+          body += '<hr>';
+        } else if (line.startsWith('- ')) {
+          if (!inList) { body += '<ul>'; inList = true; }
+          const c = line.slice(2).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/`(.+?)`/g,'<code>$1</code>');
+          body += `<li>${c}</li>`;
+        } else if (line.startsWith('|')) {
+          if (inList) { body += '</ul>'; inList = false; }
+          if (!inTable) { body += '<table>'; inTable = true; tableHasHeader = false; }
+          const cells = line.split('|').slice(1,-1);
+          const isSep = cells.every(c => c.trim().match(/^[-: ]+$/));
+          if (isSep) { tableHasHeader = true; return; }
+          const tag = !tableHasHeader ? 'th' : 'td';
+          body += '<tr>' + cells.map(c => `<${tag}>${c.trim().replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')}</${tag}>`).join('') + '</tr>';
+        } else {
+          if (inTable) { body += '</table>'; inTable = false; }
+          if (inList) { body += '</ul>'; inList = false; }
+          if (line.trim()) {
+            const c = line.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/`(.+?)`/g,'<code>$1</code>');
+            body += `<p>${c}</p>`;
+          }
+        }
+      });
+      if (inList) body += '</ul>';
+      if (inTable) body += '</table>';
+
+      const win = window.open('', '_blank');
+      win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head>
+        <meta charset="UTF-8">
+        <title>Briefing — ${clinica}</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@700&display=swap');
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 12.5px; color: #17171A; line-height: 1.7; padding: 28px 36px; }
+          h1 { font-family: 'Sora', sans-serif; font-size: 19px; font-weight: 700; color: #0F1923; margin-bottom: 4px; }
+          h2 { font-family: 'Sora', sans-serif; font-size: 13.5px; font-weight: 700; color: #1A9962; border-bottom: 1.5px solid #D0CFC8; padding-bottom: 3px; margin: 20px 0 7px; }
+          h3 { font-size: 12.5px; font-weight: 600; color: #17171A; margin: 12px 0 4px; }
+          p { margin: 2px 0 4px; }
+          ul { padding-left: 18px; margin: 4px 0; }
+          li { margin: 2px 0; }
+          hr { border: none; border-top: 1px solid #E3E2DC; margin: 10px 0; }
+          table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12px; }
+          th { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #9E9E99; padding: 5px 8px; border-bottom: 2px solid #D0CFC8; text-align: left; }
+          td { padding: 5px 8px; border-bottom: 1px solid #E3E2DC; }
+          code { background: #F2F1ED; border-radius: 3px; padding: 1px 5px; font-family: monospace; font-size: 11px; }
+          strong { font-weight: 600; }
+          @media print {
+            body { padding: 0; }
+            h2 { page-break-before: auto; }
+            table, ul { page-break-inside: avoid; }
+          }
+        </style>
+      </head><body>${body}
+        <script>window.onload = function(){ window.print(); }<\/script>
+      </body></html>`);
+      win.document.close();
+    }
+
+    function toast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2800);
+    }
+
+    // ─── INIT ────────────────────────────────────────────────
+    buildSidebar();
+    buildAgenda();
+
+
+    buildObjecoes();
+    updateProgress();
+  </script>
+</body>
+
+</html>

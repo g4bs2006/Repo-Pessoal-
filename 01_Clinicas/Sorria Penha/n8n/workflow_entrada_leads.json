@@ -1,0 +1,330 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-novo-sorria-penha",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -528,
+        320
+      ],
+      "id": "3f2a6c1e-2f8f-4a0a-8f37-fe1a3d5c9d01",
+      "name": "Lead Novo (SESSION_NEW)",
+      "webhookId": "lead-novo-sorria-penha"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Evento SESSION_NEW do WTS/Helena. Dados reais em body.content.\nconst b = $input.first().json.body || $input.first().json;\nconst c = b.content || b;\n\nconst companyId = c.companyId || null;\nconst sessionId = c.id || null;\nconst contactId = c.contactId || (c.contactDetails ? c.contactDetails.id : null);\nconst contactDetails = c.contactDetails || {};\nconst contactName = (contactDetails.name && contactDetails.name.trim()) ? contactDetails.name.trim() : 'Sem nome';\nconst telefoneFormatado = contactDetails.phonenumberFormatted || contactDetails.phonenumber || '';\nconst telefoneLimpo = (contactDetails.phonenumber || contactDetails.phonenumberFormatted || '').toString().replace(/\\D/g, '');\n\nconst channelDetails = c.channelDetails || {};\nconst numeroRecebido = (channelDetails.id || '').toString().replace(/\\D/g, '');\n\n// ---------------------------------------------------------------------\n// Mapeamento número do WhatsApp (número de leads) -> unidade.\n// Aceita o número com e sem o prefixo de país 55, pois ainda não\n// confirmamos em qual formato o channelDetails.id chega para esta conta.\n// Penha:   21 9 9195-0355 | Caxias: 21 98799-1162 | Recreio: 21 98746-9219\n// ---------------------------------------------------------------------\nconst NUMERO_PARA_UNIDADE = {\n    '21991950355': 'penha',\n    '5521991950355': 'penha',\n    '21987991162': 'caxias',\n    '5521987991162': 'caxias',\n    '21987469219': 'recreio',\n    '5521987469219': 'recreio'\n};\nconst unidadeDetectada = NUMERO_PARA_UNIDADE[numeroRecebido] || 'nao_definida';\n\n// Tags de unidade já cadastradas no Helena (aplicar quando o mapeamento acima estiver pronto)\n// IDs das tags do PAINEL (nao das tags de contato) -- sao pools diferentes no Helena/WTS.\n// Tag de contato \"Unidade Penha/Recreio/Caxias\" NAO funciona aqui; o card exige a tag do painel.\nconst TAG_UNIDADE = {\n    penha: 'ae3a727e-c0e9-44be-be97-97f8bb1735de',\n    recreio: '9adfe4f5-c03b-497d-bc69-a207e3be5305',\n    caxias: '0cf0b4b3-567e-4fcc-8577-d70916a73ca5'\n};\nconst tagUnidadeId = TAG_UNIDADE[unidadeDetectada] || null;\n\n// ---------------------------------------------------------------------\n// Detecção de origem (Facebook / Instagram / Orgânico) via UTM do anúncio,\n// com fallback para a plataforma do canal quando não há UTM.\n// ---------------------------------------------------------------------\nconst utm = c.utm || null;\nconst utmSource = (utm && utm.source) ? String(utm.source).toUpperCase() : null;\nconst campanhaNome = (utm && (utm.headline || utm.campaign || utm.campaignName)) || null;\nconst platform = (channelDetails.platform || c.channelType || '').toString().toUpperCase();\n\nconst origemRaw = utmSource || platform || 'DESCONHECIDO';\nlet origemDetectada;\nif (origemRaw.includes('INSTAGRAM')) origemDetectada = 'instagram';\nelse if (origemRaw.includes('FACEBOOK') || origemRaw.includes('META')) origemDetectada = 'facebook';\nelse origemDetectada = 'organico';\n\n// Tags de origem do PAINEL (mesmo pool das tags de unidade, distinto das tags de contato)\nconst TAG_ORIGEM = {\n    facebook: '0b6a4e15-d813-4298-b6a2-80689ff01551',\n    instagram: 'ad5ddba4-e1f8-4ec4-9ef0-594b72723309',\n    organico: '311daa9c-2366-4156-a4b4-856237133ea0'\n};\nconst tagOrigemId = TAG_ORIGEM[origemDetectada] || null;\n\nconst tagIdsCard = [tagUnidadeId, tagOrigemId].filter(Boolean);\n\n// Nome de exibição da unidade, para o campo personalizado \"Unidade\" do painel\nconst UNIDADE_DISPLAY = { penha: 'Penha', recreio: 'Recreio', caxias: 'Caxias' };\nconst unidadeDisplay = UNIDADE_DISPLAY[unidadeDetectada] || null;\n\nconst customFieldsCard = {};\nif (unidadeDisplay) customFieldsCard.unidade = unidadeDisplay;\nif (campanhaNome) customFieldsCard['campanha-'] = campanhaNome;\n\n// Config do Kanban (declarada direto no código — sem Supabase, clínica única)\nconst KANBAN = {\n    helena_token: 'pn_FeGSOXOMB8wT3X4VfS4QoxrxwMBxWgKsSZKJgH8qkPs',\n    panel_id: '8d009d78-8d18-4a74-8d56-1956e2f5e26a',\n    step_leads_id: '20e5cc71-4548-4f11-89f4-759cbfdc263d'\n};\n\nconst agora = DateTime.now().setZone('America/Sao_Paulo');\nconst dataEntrada = agora.toFormat('dd/MM/yyyy');\nconst horaEntrada = agora.toFormat('HH:mm');\n\nconst descricaoPartes = [\n    `Entrada: ${dataEntrada} às ${horaEntrada}`,\n    `Telefone: ${telefoneFormatado}`,\n    `Unidade (WhatsApp recebido): ${unidadeDetectada}`,\n    `Origem: ${origemDetectada}`\n];\nif (campanhaNome) descricaoPartes.push(`Campanha: ${campanhaNome}`);\nconst descricao = descricaoPartes.join('\\n');\n\nreturn {\n    json: {\n        companyId,\n        sessionId,\n        contactId,\n        contactName,\n        telefoneFormatado,\n        telefoneLimpo,\n        numeroRecebido,\n        unidadeDetectada,\n        tagUnidadeId,\n        origemDetectada,\n        tagOrigemId,\n        campanhaNome,\n        tagIdsCard,\n        customFieldsCard,\n        kanban: KANBAN,\n        dataEntrada,\n        horaEntrada,\n        descricao\n    }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -304,
+        320
+      ],
+      "id": "5a1c7e2b-6b3d-4e5a-9f1a-8c2d3e4f5a6b",
+      "name": "Extrair e Configurar"
+    },
+    {
+      "parameters": {
+        "url": "https://api.wts.chat/crm/v1/panel/card",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "PanelId",
+              "value": "={{ $json.kanban.panel_id }}"
+            },
+            {
+              "name": "ContactId",
+              "value": "={{ $json.contactId }}"
+            },
+            {
+              "name": "PageSize",
+              "value": "1"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.kanban.helena_token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -80,
+        320
+      ],
+      "id": "7c9d1e2f-3a4b-4c5d-8e6f-1a2b3c4d5e6f",
+      "name": "Buscar Card do Contato",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nconst items = Array.isArray(resp) ? resp : (resp.items ?? []);\nconst hasCard = Array.isArray(items) && items.length > 0;\nconst cardId = hasCard ? (items[0].id ?? null) : null;\nreturn [{ json: { hasCard, cardId } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        144,
+        320
+      ],
+      "id": "9e0f1a2b-4c5d-4e6f-8a7b-2c3d4e5f6a7b",
+      "name": "Tem Card?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c0",
+              "leftValue": "={{ $json.hasCard }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        368,
+        320
+      ],
+      "id": "1a2b3c4d-5e6f-4a7b-8c9d-3e4f5a6b7c8d",
+      "name": "Card Existe?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.wts.chat/crm/v1/panel/card/{{ $json.cardId }}/note",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Extrair e Configurar').first().json.kanban.helena_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": {{ JSON.stringify('Lead voltou a interagir em ' + $('Extrair e Configurar').first().json.dataEntrada + ' às ' + $('Extrair e Configurar').first().json.horaEntrada) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        592,
+        224
+      ],
+      "id": "2b3c4d5e-6f7a-4b8c-9d0e-4f5a6b7c8d9e",
+      "name": "Adicionar Anotacao (Lead Retornou)",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.wts.chat/crm/v1/panel/card",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Extrair e Configurar').first().json.kanban.helena_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"panelId\": \"{{ $('Extrair e Configurar').first().json.kanban.panel_id }}\",\n  \"stepId\": \"{{ $('Extrair e Configurar').first().json.kanban.step_leads_id }}\",\n  \"title\": {{ JSON.stringify($('Extrair e Configurar').first().json.contactName) }},\n  \"description\": {{ JSON.stringify($('Extrair e Configurar').first().json.descricao) }},\n  \"contactIds\": [\"{{ $('Extrair e Configurar').first().json.contactId }}\"],\n  \"tagIds\": {{ JSON.stringify($('Extrair e Configurar').first().json.tagIdsCard) }},\n  \"customFields\": {{ JSON.stringify($('Extrair e Configurar').first().json.customFieldsCard) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        592,
+        424
+      ],
+      "id": "3c4d5e6f-7a8b-4c9d-0e1f-5a6b7c8d9e0f",
+      "name": "Criar Card em Leads",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"ok\",\n  \"acao\": \"{{ $('Card Existe?').first().json.hasCard ? 'anotacao' : 'card_criado' }}\",\n  \"unidade_detectada\": \"{{ $('Extrair e Configurar').first().json.unidadeDetectada }}\",\n  \"origem_detectada\": \"{{ $('Extrair e Configurar').first().json.origemDetectada }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        816,
+        320
+      ],
+      "id": "4d5e6f7a-8b9c-4d0e-1f2a-6b7c8d9e0f1a",
+      "name": "Resp: OK"
+    }
+  ],
+  "connections": {
+    "Lead Novo (SESSION_NEW)": {
+      "main": [
+        [
+          {
+            "node": "Extrair e Configurar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair e Configurar": {
+      "main": [
+        [
+          {
+            "node": "Buscar Card do Contato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Card do Contato": {
+      "main": [
+        [
+          {
+            "node": "Tem Card?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem Card?": {
+      "main": [
+        [
+          {
+            "node": "Card Existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Card Existe?": {
+      "main": [
+        [
+          {
+            "node": "Adicionar Anotacao (Lead Retornou)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Criar Card em Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adicionar Anotacao (Lead Retornou)": {
+      "main": [
+        [
+          {
+            "node": "Resp: OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar Card em Leads": {
+      "main": [
+        [
+          {
+            "node": "Resp: OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "Lead Novo (SESSION_NEW)": [
+      {
+        "headers": {
+          "content-type": "application/json"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "eventType": "SESSION_NEW",
+          "date": "2026-07-13T16:19:27.7333438Z",
+          "content": {
+            "id": "d7968305-2b4d-4dda-b0fc-b2b7a4b14760",
+            "createdAt": "2026-07-13T16:19:27.4475588Z",
+            "active": true,
+            "status": "PENDING",
+            "contactId": "c64dcdf3-86d7-4a30-8a7e-8ee362a1af65",
+            "contactDetails": {
+              "id": "c64dcdf3-86d7-4a30-8a7e-8ee362a1af65",
+              "name": "Heitor Alves",
+              "phonenumber": "+55|88996596614",
+              "phonenumberFormatted": "(88) 99659-6614"
+            },
+            "channelId": "ef1f880e-86ff-47a5-a3bd-1d01a2f2af55",
+            "channelType": "CLOUDAPI_WHATSAPP",
+            "channelDetails": {
+              "id": "(43) 99155-9988",
+              "platform": "WhatsApp",
+              "provider": "Meta"
+            },
+            "companyId": "9c12ee45-64f9-4a1e-9353-7fea72e5fc5f",
+            "departmentId": "1bb821ff-6501-444c-bcf4-efa163bd8543",
+            "utm": null
+          }
+        },
+        "webhookUrl": "https://SEU-HOST-N8N/webhook/lead-novo-sorria-penha",
+        "executionMode": "production"
+      }
+    ]
+  },
+  "meta": {
+    "instanceId": "d1a2ea4f12ae9ebd3132590ec74e61784d3b49e17967bcb70d511f83551a7c49"
+  }
+}
