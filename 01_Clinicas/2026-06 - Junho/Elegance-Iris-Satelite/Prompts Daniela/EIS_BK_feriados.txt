@@ -1,2 +1,0 @@
-Nome: EIS_BK_feriados
-Quando usar: Consultar antes de oferecer ou confirmar qualquer horário de agendamento para verificar se a data solicitada é feriado nacional, estadual ou municipal em Campinas/SP em 2026.

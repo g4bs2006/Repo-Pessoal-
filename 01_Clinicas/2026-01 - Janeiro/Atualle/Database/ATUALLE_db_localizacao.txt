@@ -1,3 +1,0 @@
-Unidade,Endereço,Ponto de Referência,Dias de Funcionamento,Horário Sábado
-Centro Conselheiro Lafaiete,Rua José Nicolau de Queiroz número 266,Ao lado da CROC,"Segunda, Quarta e Sexta",09h às 11h30
-Congonhas,[A preencher],[A preencher],"Terça e Quinta",09h às 11h30

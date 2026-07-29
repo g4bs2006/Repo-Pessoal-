@@ -1,8 +1,0 @@
-ID,Tipo,Conteúdo,Tags
-1,Endereço Completo,"Av. John Boyd Dunlop, 8448 - Cidade Satélite Íris, Campinas - SP, 13059-587",endereco,localizacao
-2,Referência de Localização,"Próximo ao mercado DG e Pague Menos",referencia,como chegar,ponto de referencia
-3,Telefone de Contato,"(19) 98609-8356 — WhatsApp disponível",telefone,contato,whatsapp
-4,Horário Semana,"Segunda a Sexta: 08h00 às 18h00. Intervalo de almoço: 12h00 às 13h00. Último agendamento disponível: 17h45.",horario,semana,funcionamento
-5,Horário Sábado,"Sábado: 08h00 às 12h00. Último agendamento disponível: 11h45. Sem intervalo de almoço.",horario,sabado
-6,Domingo e Feriados,"Domingo: fechado. Feriados: verificar calendário EIS_BK_feriados antes de oferecer horários.",domingo,feriado,fechado
-7,Redes Sociais,"Instagram: @elegancesorriso",redes sociais,instagram,seguir

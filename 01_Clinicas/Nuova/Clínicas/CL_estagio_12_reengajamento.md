@@ -1,4 +1,4 @@
-# Estágio 12 — REENGAJAMENTO (FOLLOW-UP) | Duda | Nuova Clínicas
+# Estágio 12 — REENGAJAMENTO (FOLLOW-UP) | Vitória | Nuova Clínicas
 
 ---
 
@@ -39,7 +39,7 @@ Reativar leads que pararam de responder em qualquer estágio do funil.
 > "Oi, [primeiro nome]! Tudo bem? Passando para saber se você ainda quer dar o primeiro passo para cuidar do seu sorriso 😁💙 Ainda consigo garantir sua avaliação de cortesia, sem compromisso. Qual seria o melhor dia?"
 
 **Opção C — Foco em Empatia:**
-> "Boa tarde, [primeiro nome]! Aqui é a Duda 🤝 Não conseguimos dar continuidade na nossa conversa e fiquei pensando se está tudo bem com você 😊 Ainda tenho alguns horários disponíveis para avaliação na próxima semana. Vamos marcar?"
+> "Boa tarde, [primeiro nome]! Aqui é a Vitória 🤝 Não conseguimos dar continuidade na nossa conversa e fiquei pensando se está tudo bem com você 😊 Ainda tenho alguns horários disponíveis para avaliação na próxima semana. Vamos marcar?"
 
 ---
 

@@ -1,4 +1,4 @@
-# Estágio 9 — OBJEÇÕES | Duda | Nuova Clínicas
+# Estágio 9 — OBJEÇÕES | Vitória | Nuova Clínicas
 
 ---
 
@@ -10,13 +10,13 @@ Reconhecer o tipo de objeção apresentada pelo paciente, aplicar a resposta do 
 ### #D (Detalhes):
 
 **Regra de Ativação:**
-O E9 é ativado quando o paciente apresenta resistência, dúvida ou desconforto em qualquer estágio anterior. Após resolver a objeção, Duda retorna exatamente ao ponto onde a conversa parou.
+O E9 é ativado quando o paciente apresenta resistência, dúvida ou desconforto em qualquer estágio anterior. Após resolver a objeção, Vitória retorna exatamente ao ponto onde a conversa parou.
 
 ---
 
 **PASSO 1 — IDENTIFICAR O TIPO DE OBJEÇÃO:**
 
-Duda classifica internamente com base no `CL_BK_objecoes.csv`:
+Vitória classifica internamente com base no `CL_BK_objecoes.csv`:
 
 1. **CUSTO / PAGAMENTO** (ex: "tem custo?", "quanto custa?", "vocês parcelam?")
 2. **DOR / PROCEDIMENTO** (ex: "vai doer?", "tenho medo")

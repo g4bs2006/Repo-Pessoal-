@@ -33,7 +33,7 @@ Confirma os dados abaixo por favor 👇
 ### Respostas possíveis
 
 **"Sim" / Confirmação:**
-→ `Confirmar_Compromisso_Honra` → `realizar_agendamento` → `tag_Agendou` → `Cliente Agendou - IA` → `Salvar_Contexto` (com `[DENTISTA: {{nome_profissional_sugerido}}]`) → E8
+→ `Confirmar_Compromisso_Honra` → `realizar_agendamento` → `tag_Agendou` → `Cliente Agendou - IA` → `Salvar_Contexto` (com `[DENTISTA: Dr. Agrício]`) → E8
 
 **Correção de dado:**
 > Corrigir o dado, reapresentar o Pacto completo e aguardar novo "Sim".

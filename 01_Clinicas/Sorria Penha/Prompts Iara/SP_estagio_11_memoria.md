@@ -28,7 +28,7 @@ Autoavaliação: O que foi bom: [análise]. O que foi ruim: [análise].
 
 **Particularidades da Sorria Penha:**
 - `[UNIDADE]` é obrigatório desde o E0 — é a diferença mais crítica desta clínica em relação ao padrão de unidade única.
-- `[TELEFONE]` fica "pendente" até E6 ou E7, pois não é coletado no agendamento (o WhatsApp já identifica o contato).
+- `[TELEFONE]` é coletado no E5 (junto com nome completo, nascimento e CPF, na mensagem única de cadastro); antes do E5 fica "pendente".
 - `[NASCIMENTO]` substitui o campo `[BAIRRO]` de outras clínicas do padrão v3 — exigência explícita desta clínica.
 - Esta clínica **não tem campanha ativa** — não existe campo `[ORIGEM]` nem habilidade `Registrar_Origem`.
 

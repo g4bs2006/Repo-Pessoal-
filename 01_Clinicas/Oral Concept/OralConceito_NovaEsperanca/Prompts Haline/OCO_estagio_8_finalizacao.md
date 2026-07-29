@@ -14,7 +14,7 @@ Finalizar o atendimento com acolhimento e segurança. Confirmar visualmente o ag
 Prontinho, [nome]! Sua avaliação está confirmada ✅
 🗓️ Dia: [Data]
 ⏰ Horário: [Horário]
-👩‍⚕️ Dentista: {{nome_profissional_sugerido}}
+👩‍⚕️ Dentista: Dra. Letícia
 📍 Oral Conceito – Nova Esperança, Parnamirim/RN
 ```
 

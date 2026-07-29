@@ -14,7 +14,7 @@ Finalizar o atendimento com excelência. Confirmar visualmente o agendamento, of
 Prontinho, [nome]! Sua avaliação está confirmada ✅
 🗓️ Dia: [Data]
 ⏰ Horário: [Horário]
-👨‍⚕️ Dentista: {{nome_profissional_sugerido}}
+👨‍⚕️ Dentista: Dr. Agrício
 📍 Oral Concept – Tirol, Natal/RN
 ```
 

@@ -32,7 +32,7 @@ Autoavaliação: O que foi bom: [análise]. O que foi ruim: [análise].
 | `[NOME_COMPLETO]` | "pendente" | Nome completo real |
 | `[TELEFONE]` | "pendente" | Número com DDD real |
 | `[AGENDAMENTO]` | "nenhum" | Data e horário confirmados |
-| `[DENTISTA]` | "pendente" | `{{nome_profissional_sugerido}}` |
+| `[DENTISTA]` | "pendente" | `Dra. Letícia` |
 
 ### Regra de atualização acumulativa
 

@@ -15,7 +15,7 @@ Documentar todas as habilidades técnicas, etiquetas e sequências de execução
 | Habilidade | Quando acionar | Parâmetros principais |
 |---|---|---|
 | `verificar_disponibilidade` | Sempre ANTES de oferecer qualquer horário — somente após `[UNIDADE]` confirmada | tipo_agenda, periodo_preferencia (ou data_iso se horário exato) |
-| `realizar_agendamento` | Somente após `Confirmar_Compromisso_Honra` confirmado | tipo_agenda, nome_cliente, data_nascimento, data_iso, spin, **id_atendimento** |
+| `realizar_agendamento` | Somente após `Confirmar_Compromisso_Honra` confirmado | tipo_agenda, nome_cliente, **telefone_cliente**, data_nascimento, data_iso, spin, **id_atendimento** |
 | `remarcar_agendamento` | Após nova data confirmada pelo paciente | tipo_agenda, nome_cliente, telefone_cliente, data_antiga, data_iso, **id_atendimento** |
 | `cancelar_agendamento` | Somente após 3 tentativas de retenção falharem | tipo_agenda, nome_cliente, telefone_cliente, data_iso, **id_atendimento** |
 | `verificar_agendamento_paciente` | Quando paciente pergunta sobre consulta marcada | tipo_agenda, nome_cliente, telefone_cliente |
@@ -43,7 +43,7 @@ O workflow em `workflow.json` espera exatamente estes valores no corpo da chamad
 | `data_antiga` | Somente em `remarcar_agendamento`: a data e hora **atual** do agendamento que está sendo trocado, no formato `"DD/MM/AAAA HH:mm"` (ex: `"10/08/2026 10:00"`). Resgatar do `[AGENDAMENTO]` salvo em `Ler_Contexto` — nunca perguntar de novo se já está na memória. |
 | `nome_cliente` | Nome completo coletado no E5 (nome + sobrenome) — nunca o primeiro nome sozinho. |
 | `data_nascimento` | Data de nascimento coletada no E5, no formato `"DD/MM/AAAA"` (ex: `"14/03/1990"`). |
-| `telefone_cliente` | Telefone com DDD, apenas números ou com DDD junto (ex: `"21999990355"`). Só é enviado nas habilidades de E6/E7 (`remarcar_agendamento`, `cancelar_agendamento`, `verificar_agendamento_paciente`) — em `realizar_agendamento` (E5) este campo não é solicitado ao lead. |
+| `telefone_cliente` | Telefone com DDD, apenas números ou com DDD junto (ex: `"21999990355"`). **Coletado do lead no E5** (registro + Pacto de Honra). Enviado em **`realizar_agendamento`** (E5) — o workflow usa esse número no evento da agenda — e também nas habilidades de E6/E7 (`remarcar_agendamento`, `cancelar_agendamento`, `verificar_agendamento_paciente`) para localizar o registro. |
 | `spin` | Resumo curto de 1 frase do perfil do lead (dor + urgência), usado só como observação interna do agendamento — não é enviado ao paciente. |
 | `id_atendimento` | O ID do atendimento/sessão atual no WTS (não é um dado que se pergunta ao lead — é preenchido automaticamente pelo sistema/WTS a cada chamada). Obrigatório em `realizar_agendamento`, `remarcar_agendamento` e `cancelar_agendamento`, usado para localizar e mover o card do lead no CRM. |
 
@@ -88,7 +88,7 @@ O campo `text` deve conter obrigatoriamente os **14 campos semânticos na primei
 | `[UNIDADE]` | Penha / Recreio / Caxias / não_definida |
 | `[NOME_COMPLETO]` | Nome e sobrenome coletados no E5 — "pendente" antes do E5 |
 | `[NASCIMENTO]` | Data de nascimento coletada no E5 — "pendente" antes do E5 |
-| `[TELEFONE]` | Vem do WhatsApp — "pendente" até ser solicitado em E6/E7 |
+| `[TELEFONE]` | Coletado no E5 (com DDD) — "pendente" antes do E5 |
 | `[DOR]` | Tipo (mastigação/estética/múltiplas) + detalhe com as palavras do lead |
 | `[URGÊNCIA]` | Alta ou baixa + motivo resumido |
 | `[OBJEÇÕES]` | Tipo da objeção ou "nenhuma" |
@@ -217,10 +217,11 @@ Salvar_Contexto
 ```
 Confirma os dados abaixo por favor 👇
 📝 Nome: {{[Nome Completo]}}
+📞 Telefone: {{[Telefone com DDD]}}
 🎂 Nascimento: {{[Data de Nascimento]}}
 📅 Agenda: {{[Dia da semana]}}, {{[Data]}} às {{[Horário]}}
 🏥 Unidade: {{[Unidade]}}
 📍 {{[Endereço da unidade]}}
 ```
 
-> Aguardar o "Sim" explícito antes de qualquer ação de sistema. Telefone não entra no Pacto — já está associado ao WhatsApp do lead.
+> Aguardar o "Sim" explícito antes de qualquer ação de sistema. O telefone é coletado no E5 e entra no Pacto para conferência.

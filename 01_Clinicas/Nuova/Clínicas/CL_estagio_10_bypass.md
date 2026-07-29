@@ -1,4 +1,4 @@
-# Estágio 10 — AGENDAMENTO DIRETO (BYPASS) | Duda | Nuova Clínicas
+# Estágio 10 — AGENDAMENTO DIRETO (BYPASS) | Vitória | Nuova Clínicas
 
 ---
 

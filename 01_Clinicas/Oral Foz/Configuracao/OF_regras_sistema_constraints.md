@@ -133,16 +133,17 @@ Se em **qualquer momento do atendimento** Yara perceber que o interesse do pacie
 
 | Dia | Horário |
 |---|---|
-| Segunda a Sexta | 9h às 12h e 13h30 às 18h30 |
-| Sábado | 8h às 12h |
+| Segunda a Sexta | 9h às 11h30 e 13h30 às 18h30 |
+| Sábado | 8h às 11h30 |
 | Domingo | Fechado |
 
 - ❌ **Proibido:** Oferecer ou confirmar horários fora desses intervalos.
+- ❌ **Proibido:** Oferecer ou confirmar horário às 12h (meio-dia) — o último horário da manhã é 11h30.
 - ❌ **Proibido:** Agendar aos domingos.
 - ❌ **Proibido:** Agendar antes das 9h ou após as 18h30 (segunda a sexta).
-- ❌ **Proibido:** Agendar antes das 8h ou após as 12h aos sábados.
+- ❌ **Proibido:** Agendar antes das 8h ou após as 11h30 aos sábados.
 
-Se `verificar_disponibilidade` retornar horário fora do funcionamento → descartá-lo silenciosamente e usar o próximo disponível.
+Se `verificar_disponibilidade` retornar horário fora do funcionamento (incluindo qualquer slot às 12h) → descartá-lo silenciosamente e usar o próximo disponível.
 
 ---
 

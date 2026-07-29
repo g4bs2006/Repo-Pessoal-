@@ -50,7 +50,8 @@ Após o nome: telefone → data antiga → data nova.
 Execute `verificar_disponibilidade`.
 
 **RESTRIÇÃO DE HORÁRIOS:** Oferecer apenas horários dentro do funcionamento:
-- Segunda a Sexta: 9h às 12h e 13h30 às 18h30 | Sábado: 8h às 12h | Domingo: fechado
+- Segunda a Sexta: 9h às 11h30 e 13h30 às 18h30 | Sábado: 8h às 11h30 | Domingo: fechado
+- ⚠️ Último horário da manhã = 11h30. Nunca ofertar 12h (meio-dia); se a API retornar 12h, descartar e usar o próximo.
 
 Se houver vaga → `remarcar_agendamento` → aguardar retorno.
 Após sucesso: `tag_Remarcou` → `Remarcar`.
