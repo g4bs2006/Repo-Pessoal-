@@ -1,0 +1,3167 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// --- CONFIGURAÇÃO MESTRE: PRIME DENTE — MULTI-UNIDADE ---\nconst body = $input.item.json.body || $input.item.json;\n\nconst idAtendimento = body.id_atendimento || body.atendimento_id || body.session_id || body.sessionId || '';\nconst telefoneRaw = body.telefone_cliente || body.telefone_contato || body.telefone || '';\nconst telefoneLimpo = telefoneRaw.toString().replace(/\\D/g, '');\nconst nomePaciente = body.nome_cliente || body.nome_contato || 'Paciente';\nconst insistiu = body.insistiu === true || String(body.insistiu).toLowerCase() === 'true';\n\n// ✅ CORREÇÃO: lê 'unidade_selecionada' OU 'unidade'\nconst unidade = (body.unidade_selecionada || body.unidade || 'meier').toLowerCase().trim();\n\nconst TIMEZONE = 'America/Sao_Paulo';\n\n// ── Profissionais — Méier ─────────────────────────────────────\nconst LORRAINE_MEIER = { id: '6600846999945216', nome: 'Dra. Lorraine Ribeiro Mendes' };\nconst THIAGO_MEIER   = { id: '4826463870648320', nome: 'Dr. Thiago H. Q. Menezes' };\n\nconst PROF_MEIER = {\n  1: THIAGO_MEIER,    // Segunda\n  2: LORRAINE_MEIER,  // Terça\n  3: LORRAINE_MEIER,  // Quarta\n  4: THIAGO_MEIER,    // Quinta\n  5: LORRAINE_MEIER,  // Sexta\n  6: null,            // Sábado — fechado\n  7: null             // Domingo — fechado\n};\n\n// ── Profissionais — Botafogo ──────────────────────────────────\nconst LORRAINE_BOTAFOGO = { id: '6073971665403904', nome: 'Dra. Lorraine Ribeiro Mendes' };\nconst THIAGO_BOTAFOGO   = { id: '6085639640186880', nome: 'Dr. Thiago H. Q. Menezes' };\n\nconst PROF_BOTAFOGO = {\n  1: LORRAINE_BOTAFOGO,  // Segunda\n  2: THIAGO_BOTAFOGO,    // Terça\n  3: null,               // Quarta — sem atendimento\n  4: LORRAINE_BOTAFOGO,  // Quinta\n  5: THIAGO_BOTAFOGO,    // Sexta\n  6: null,               // Sábado — fechado\n  7: null                // Domingo — fechado\n};\n\nconst FERIADOS = [\n  '2026-04-21', // Tiradentes\n  '2026-05-01', // Dia do Trabalho\n  '2026-06-04', // Corpus Christi\n  '2026-09-07', // Independência\n  '2026-10-12', // N. Sra. Aparecida\n  '2026-11-02', // Finados\n  '2026-11-15', // Proclamação da República\n  '2026-12-25', // Natal\n  '2026-01-01', // Ano Novo\n];\n\n// ── Configs por unidade ───────────────────────────────────────\nconst CONFIG_MEIER = {\n  subscriber_id:            '10114924740',\n  business_id:              '5516186830241792',\n  nome_unidade:             'Méier',\n  nome_empresa:             'Prime Dente',\n  link_agenda:              '57162',\n  duracao_servico:          30,\n  capacidade_simultanea:    1,\n  timezone:                 TIMEZONE,\n  limite_dias_busca_normal: 7,\n  profissionais_por_dia:    PROF_MEIER,\n  authorization:            'Basic ' + Buffer.from('primedente:ecdd291e-97ae-4f26-8d3b-d025c58a7985').toString('base64'),\n  feriados:                 FERIADOS\n};\n\nconst CONFIG_BOTAFOGO = {\n  subscriber_id:            '48543547000160',\n  business_id:              '6607905423622144',\n  nome_unidade:             'Botafogo',\n  nome_empresa:             'Prime Dente',\n  link_agenda:              '73549',\n  duracao_servico:          30,\n  capacidade_simultanea:    1,\n  timezone:                 TIMEZONE,\n  limite_dias_busca_normal: 7,\n  profissionais_por_dia:    PROF_BOTAFOGO,\n  authorization:            'Basic ' + Buffer.from('primebotafogo:d7df9d4a-e641-4448-97bb-14b11595ddbc').toString('base64'),\n  feriados:                 FERIADOS\n};\n\nconst CONFIG = unidade === 'botafogo' ? CONFIG_BOTAFOGO : CONFIG_MEIER;\n\n// ── Parse de datas ────────────────────────────────────────────\nconst hoje = DateTime.now().setZone(TIMEZONE);\n\nconst dataRaw = body.data_iso || body.data_inicio || body.data_agendada || '';\nlet dtP = null;\n\nif (dataRaw) {\n  dtP = DateTime.fromISO(dataRaw, { zone: TIMEZONE });\n  if (!dtP.isValid) dtP = DateTime.fromFormat(dataRaw, 'yyyy-MM-dd HH:mm', { zone: TIMEZONE });\n  if (!dtP.isValid) dtP = DateTime.fromFormat(dataRaw, 'dd/MM/yyyy HH:mm', { zone: TIMEZONE });\n}\n\nconst horaDoISO = (dtP && dtP.isValid && (dtP.hour > 0 || dtP.minute > 0))\n  ? dtP.toFormat('HH:mm') : '';\n\nconst horaRaw = (body.horario_agendado && body.horario_agendado.length >= 4)\n  ? body.horario_agendado\n  : (body.horario && body.horario.length >= 4)\n  ? body.horario\n  : horaDoISO;\n\nconst horaFinal = horaRaw ? horaRaw.substring(0, 5) : '';\n\nconst dataFinal = (dtP && dtP.isValid) ? dtP.toFormat('yyyy-MM-dd') : '';\n\n// ── Cálculo de data_inicio e data_fim ─────────────────────────\nlet dataMinimaRaw = body.data_minima || null;\nlet dtMinima = null;\n\nif (dataMinimaRaw) {\n  dtMinima = DateTime.fromISO(dataMinimaRaw, { zone: TIMEZONE });\n  if (!dtMinima.isValid) dtMinima = DateTime.fromFormat(dataMinimaRaw, 'yyyy-MM-dd', { zone: TIMEZONE });\n}\n\nlet dataInicioCalc = hoje;\nif (dtMinima && dtMinima.isValid && dtMinima > dataInicioCalc) {\n  dataInicioCalc = dtMinima;\n} else if (dtP && dtP.isValid && dtP.startOf('day') > hoje.startOf('day')) {\n  dataInicioCalc = dtP.startOf('day');\n}\n\nconst dataInicio = dataInicioCalc.toFormat('yyyy-MM-dd');\nconst dataFim = dataFinal\n  ? DateTime.fromISO(dataFinal, { zone: TIMEZONE }).plus({ days: 7 }).toFormat('yyyy-MM-dd')\n  : hoje.plus({ days: 7 }).toFormat('yyyy-MM-dd');\n\n// ── Profissional do dia solicitado (para debug) ───────────────\nconst dtParaProf = (dtP && dtP.isValid) ? dtP : hoje;\nconst profDoDia  = CONFIG.profissionais_por_dia[dtParaProf.weekday] || null;\n\nreturn {\n  json: {\n    acao_fluxo:           body.action || body.acao_fluxo,\n    id_atendimento:       idAtendimento,\n    helena_company_id:    'ad711b94-9b7c-43d6-928f-208cda372a24',\n    nome_paciente:        nomePaciente,\n    telefone_limpo:       telefoneLimpo,\n    insistiu:             insistiu,\n    data_nascimento:      body.data_nascimento || '',\n    data_inicio:          dataInicio,\n    data_agendada:        dataFinal,\n    data_antiga:          body.data_antiga || body['data-antiga'] || '',\n    data_fim:             dataFim,\n    horario_agendado:     horaFinal,\n    horario_preferido:    body.horario_preferido || null,\n    data_minima:          dataInicio,\n    spin:                 body.SPIN || body.spin || null,\n    profissional_do_dia:  profDoDia,\n    config_agenda:        CONFIG\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2032,
+        2064
+      ],
+      "id": "81785ced-d116-433e-8970-311f09ce79a4",
+      "name": "Configuracao Unidades"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "r1",
+                    "leftValue": "={{ $json.acao_fluxo }}",
+                    "rightValue": "verificar_disponibilidade",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Consultar"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "r2",
+                    "leftValue": "={{ $json.acao_fluxo }}",
+                    "rightValue": "realizar_agendamento",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Agendar"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "r3",
+                    "leftValue": "={{ $json.acao_fluxo }}",
+                    "rightValue": "cancelar_agendamento",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Cancelar"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "r4",
+                    "leftValue": "={{ $json.acao_fluxo }}",
+                    "rightValue": "remarcar_agendamento",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Remarcar"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "r5",
+                    "leftValue": "={{ $json.acao_fluxo }}",
+                    "rightValue": "verificar_agendamento_paciente",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Verificar Paciente"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        -1808,
+        2016
+      ],
+      "id": "9f6bba31-fe88-4281-ab30-a706dc11287a",
+      "name": "Guarda de Transito"
+    },
+    {
+      "parameters": {
+        "url": "https://api.clinicorp.com/rest/v1/appointment/get_avaliable_days",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "subscriber_id",
+              "value": "={{ $('Configuracao Unidades').first().json.config_agenda.subscriber_id }}"
+            },
+            {
+              "name": "code_link",
+              "value": "={{ $('Configuracao Unidades').first().json.config_agenda.link_agenda }}"
+            },
+            {
+              "name": "from",
+              "value": "={{ $json.data_inicio }}"
+            },
+            {
+              "name": "to",
+              "value": "={{ $json.data_fim }}"
+            },
+            {
+              "name": "showAvailableTimes",
+              "value": "True"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.config_agenda.authorization }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1584,
+        1392
+      ],
+      "id": "499688e5-a27f-4180-aa64-54c73e799a98",
+      "name": "Verificar Agenda Disponibilidade",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -1136,
+        1392
+      ],
+      "id": "06dd1ad9-b935-4ea3-a933-842e7e1ebb44",
+      "name": "Resp: Disponibilidade"
+    },
+    {
+      "parameters": {
+        "tableId": "metricas_ia",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "clinica",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.config_agenda.nome_empresa }}"
+            },
+            {
+              "fieldId": "unidade",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.config_agenda.nome_unidade }}"
+            },
+            {
+              "fieldId": "acao",
+              "fieldValue": "consulta_disponibilidade"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "sucesso"
+            },
+            {
+              "fieldId": "telefone_paciente",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.telefone_limpo }}"
+            },
+            {
+              "fieldId": "detalhes",
+              "fieldValue": "=Solicitado: {{ $('Configuracao Unidades').first().json.data_inicio }}"
+            },
+            {
+              "fieldId": "nome_paciente",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.nome_paciente }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -912,
+        1392
+      ],
+      "id": "8059a57f-6a00-48b0-9a1a-0a2a6497ed6c",
+      "name": "LOG Disponibilidade",
+      "credentials": {
+        "supabaseApi": {
+          "id": "1I9LSC5dA1mD70Fv",
+          "name": "ANDRE ( DASH CONTACT )"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.clinicorp.com/rest/v1/appointment/get_avaliable_times_calendar",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "subscriber_id",
+              "value": "={{ $('Configuracao Unidades').first().json.config_agenda.subscriber_id }}"
+            },
+            {
+              "name": "code_link",
+              "value": "={{ $('Configuracao Unidades').first().json.config_agenda.link_agenda }}"
+            },
+            {
+              "name": "date",
+              "value": "={{ $json.data_agendada }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $('Configuracao Unidades').item.json.config_agenda.authorization }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1584,
+        1680
+      ],
+      "id": "71d5220b-be72-4eb1-9944-f9125809b939",
+      "name": "Verificar Agenda Agendar",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Validar Slot Agendar — Prime Dente v2.1 (com bloqueio de feriados) ──\nlet d = {};\ntry { d = $('Configuracao Unidades').first().json; } catch(e) { d = $input.item.json; }\n\nconst TIMEZONE      = d.config_agenda?.timezone || 'America/Sao_Paulo';\nconst PROF_POR_DIA  = d.config_agenda?.profissionais_por_dia || {};\nconst feriados      = new Set(d.config_agenda?.feriados || []);\n\n// ── Bloqueio de feriado ───────────────────────────────────────\nif (feriados.has(d.data_agendada)) {\n  return {\n    json: {\n      ...d,\n      validacao:               { aprovado: false, motivo: 'A clínica não atende neste dia (feriado).' },\n      id_profissional_final:   null,\n      nome_profissional_final: '',\n      hora_buscada:            '',\n      slots_encontrados_total: 0\n    }\n  };\n}\n\n// Resolve profissional pelo dia da data agendada\nconst dtAlvo    = DateTime.fromISO(d.data_agendada, { zone: TIMEZONE });\nconst profDoDia = PROF_POR_DIA[dtAlvo.weekday] || null;\n\nconst PROF_ID   = profDoDia ? String(profDoDia.id) : '';\nconst PROF_NOME = profDoDia ? profDoDia.nome : 'Profissional';\n\nconst inputItems    = $input.all().map(i => i.json);\nconst isNovoFormato = inputItems.length > 0 && Array.isArray(inputItems[0].AvaliableTimes);\n\nlet slots = [];\nif (isNovoFormato) {\n  slots = (inputItems[0].AvaliableTimes || []).filter(s => s.isSelectable !== false);\n} else {\n  slots = inputItems;\n}\n\nconst norm = h => {\n  if (!h) return '';\n  const p = h.toString().split(':');\n  return p[0].padStart(2,'0') + ':' + (p[1]||'00').padStart(2,'00');\n};\n\nconst hAlvo = norm(d.horario_agendado || '');\nconst slotsNoHorario = slots.filter(s => norm(isNovoFormato ? s.from : s.From) === hAlvo);\nconst slotEscolhido  = slotsNoHorario.find(s =>\n  String(isNovoFormato ? s.professionalId : s.ProfessionalId) === PROF_ID\n);\n\nlet v = { aprovado: false, motivo: 'Horário indisponível.' };\nlet idF = null, nomeF = '';\n\nif (!profDoDia) {\n  v.motivo = 'A clínica não atende neste dia da semana.';\n} else if (!slots.length) {\n  v.motivo = 'Não há agenda aberta ou horários disponíveis neste dia.';\n} else if (!hAlvo) {\n  v.motivo = 'Horário solicitado não informado.';\n} else if (slotEscolhido) {\n  v = { aprovado: true, motivo: 'Horário disponível.' };\n  idF = PROF_ID; nomeF = PROF_NOME;\n} else {\n  v.motivo = `O horário ${d.horario_agendado} não está disponível com ${PROF_NOME}.`;\n}\n\nreturn {\n  json: {\n    ...d,\n    validacao:               v,\n    id_profissional_final:   idF,\n    nome_profissional_final: nomeF,\n    hora_buscada:            hAlvo,\n    slots_encontrados_total: slots.length\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1360,
+        1680
+      ],
+      "id": "c802563f-cdd6-467a-a997-76ea27ba8be3",
+      "name": "Validar Slot Agendar"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c0",
+              "leftValue": "={{ $json.validacao.aprovado }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1136,
+        1680
+      ],
+      "id": "de65c8b4-87c1-4480-bd86-0a1807a73399",
+      "name": "Slot Valido?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"resultado\": \"Não foi possível confirmar o agendamento para {{ $json.data_agendada }} às {{ $json.horario_agendado }}. Motivo: {{ $json.validacao.motivo }}. Escolha outro horário.\",\n  \"status\": \"erro_validacao\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -912,
+        1776
+      ],
+      "id": "0bf93ac7-ed1b-4f52-9115-c53ea7a44830",
+      "name": "Resp: Erro ao Agendar"
+    },
+    {
+      "parameters": {
+        "tableId": "metricas_ia",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "clinica",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.config_agenda.nome_empresa }}"
+            },
+            {
+              "fieldId": "unidade",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.config_agenda.nome_unidade }}"
+            },
+            {
+              "fieldId": "acao",
+              "fieldValue": "agendamento_falhou"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "falha_agendamento"
+            },
+            {
+              "fieldId": "telefone_paciente",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.telefone_limpo }}"
+            },
+            {
+              "fieldId": "detalhes",
+              "fieldValue": "={{ $('Validar Slot Agendar').first().json.validacao.motivo }}"
+            },
+            {
+              "fieldId": "nome_paciente",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.nome_paciente }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -688,
+        1776
+      ],
+      "id": "6cf53b8c-77de-4b5b-865c-552f9299424c",
+      "name": "LOG Erro Agendar",
+      "credentials": {
+        "supabaseApi": {
+          "id": "1I9LSC5dA1mD70Fv",
+          "name": "ANDRE ( DASH CONTACT )"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.clinicorp.com/rest/v1/patient/get",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "subscriber_id",
+              "value": "={{ $('Configuracao Unidades').first().json.config_agenda.subscriber_id }}"
+            },
+            {
+              "name": "Name",
+              "value": "={{ $('Validar Slot Agendar').item.json.nome_paciente }}"
+            },
+            {
+              "name": "Phone",
+              "value": "={{ $('Validar Slot Agendar').item.json.telefone_limpo }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $('Configuracao Unidades').first().json.config_agenda.authorization }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -912,
+        1584
+      ],
+      "id": "bcdb247f-11e0-4d63-8483-b3a766485533",
+      "name": "Buscar Paciente Agendar",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c0",
+              "leftValue": "={{ $json.PatientId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -688,
+        1584
+      ],
+      "id": "465d3045-a370-45c5-8fc3-23dcf39e9736",
+      "name": "Paciente Existe?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.clinicorp.com/rest/v1/patient/create",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $('Validar Slot Agendar').item.json.config_agenda.authorization }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"subscriber_id\": \"{{ $('Configuracao Unidades').first().json.config_agenda.subscriber_id }}\",\n  \"Name\": \"{{ $('Configuracao Unidades').first().json.nome_paciente }}\",\n  \"MobilePhone\": \"{{ $('Configuracao Unidades').first().json.telefone_limpo }}\",\n  \"Notes\": \"Paciente cadastrado via IA (Prime)\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -464,
+        1680
+      ],
+      "id": "953788d6-7e98-45b6-aa97-7a89136aab5d",
+      "name": "Criar Novo Paciente"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"resultado\": \"Agendamento confirmado! ✅\\n\\n🗓️ Data: {{ $('Configuracao Unidades').first().json.data_agendada }}\\n⏰ Horário: {{ $('Configuracao Unidades').first().json.horario_agendado }}\\n📍 Doutor: {{ $('Unificar ID Paciente').item.json.profissional_do_dia.nome }} \\n\\nPosso ajudar em algo mais?\",\n  \"status\": \"sucesso\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        208,
+        1584
+      ],
+      "id": "e790c20c-3841-4e81-a58b-d3f9669b7b6b",
+      "name": "Resp: Sucesso Agendamento"
+    },
+    {
+      "parameters": {
+        "tableId": "metricas_ia",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "clinica",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.config_agenda.nome_empresa }}"
+            },
+            {
+              "fieldId": "unidade",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.config_agenda.nome_unidade }}"
+            },
+            {
+              "fieldId": "acao",
+              "fieldValue": "agendamento_realizado"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "sucesso"
+            },
+            {
+              "fieldId": "telefone_paciente",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.telefone_limpo }}"
+            },
+            {
+              "fieldId": "detalhes",
+              "fieldValue": "=Data: {{ $('Configuracao Unidades').first().json.data_agendada }} - Hora: {{ $('Configuracao Unidades').first().json.horario_agendado }}"
+            },
+            {
+              "fieldId": "nome_paciente",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.nome_paciente }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        432,
+        1584
+      ],
+      "id": "be166a65-6de5-4253-8df0-df66cdcf6209",
+      "name": "LOG Sucesso Agendamento",
+      "credentials": {
+        "supabaseApi": {
+          "id": "1I9LSC5dA1mD70Fv",
+          "name": "ANDRE ( DASH CONTACT )"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const config   = $('Configuracao Unidades').first().json;\nconst horaAlvo = config.horario_agendado;\nconst agmts    = $input.all().map(i => i.json);\n\nconst norm = h => {\n  if (!h) return '';\n  const p = h.toString().split(':');\n  return p[0].padStart(2,'0') + ':' + (p[1]||'00').padStart(2,'0');\n};\n\nlet enc = null;\n\n// 1ª tentativa: bate hora exata\nfor (const a of agmts) {\n  if (a.id && a.Deleted !== 'X' && norm(a.fromTime) === norm(horaAlvo)) {\n    enc = a; break;\n  }\n}\n\n// 2ª tentativa: qualquer agendamento ativo do dia\nif (!enc) {\n  for (const a of agmts) {\n    if (a.id && a.Deleted !== 'X') { enc = a; break; }\n  }\n}\n\n// ID declarado como variável explícita\nconst agendamentoId = enc ? enc.id : null;\n\nreturn { json: {\n  ...config,\n  agendamento_id:         agendamentoId,\n  agendamento_encontrado: !!agendamentoId,\n  dados_agendamento:      enc || null\n} };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1136,
+        2064
+      ],
+      "id": "f88760b1-c482-4f54-9375-3c88b489e98d",
+      "name": "Filtrar Agmt Cancelar"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c0",
+              "leftValue": "={{ $json.agendamento_encontrado }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -912,
+        2064
+      ],
+      "id": "c653986a-e0c3-4064-a673-a698b1eb7a2a",
+      "name": "Achou Para Cancelar?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.clinicorp.com/rest/v1/appointment/cancel_appointment",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.config_agenda.authorization }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"subscriber_id\": \"{{ $('Configuracao Unidades').first().json.config_agenda.subscriber_id }}\",\n  \"id\": {{ $json.agendamento_id }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -688,
+        1968
+      ],
+      "id": "e52794db-57d9-4b4b-8d2d-eca3f920ee38",
+      "name": "Cancelar Na Clinicorp"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"resultado\": \"Agendamento cancelado com sucesso! ✅\\nData: {{ $('Configuracao Unidades').first().json.data_agendada }}\\nHorário: {{ $('Configuracao Unidades').first().json.horario_agendado }}\",\n  \"status\": \"sucesso\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -464,
+        1968
+      ],
+      "id": "5b34d4ec-6d65-48aa-88ea-f6278dbf8025",
+      "name": "Resp: Cancelamento Feito"
+    },
+    {
+      "parameters": {
+        "tableId": "metricas_ia",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "clinica",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.config_agenda.nome_empresa }}"
+            },
+            {
+              "fieldId": "unidade",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.config_agenda.nome_unidade }}"
+            },
+            {
+              "fieldId": "acao",
+              "fieldValue": "cancelamento_realizado"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "sucesso"
+            },
+            {
+              "fieldId": "telefone_paciente",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.telefone_limpo }}"
+            },
+            {
+              "fieldId": "detalhes",
+              "fieldValue": "Cancelado pelo paciente via IA"
+            },
+            {
+              "fieldId": "nome_paciente",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.nome_paciente }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        1968
+      ],
+      "id": "8168b7a4-d9b3-4d37-8cb9-525c31128ec3",
+      "name": "LOG Sucesso Cancelamento",
+      "credentials": {
+        "supabaseApi": {
+          "id": "1I9LSC5dA1mD70Fv",
+          "name": "ANDRE ( DASH CONTACT )"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"resultado\": \"Não encontrei agendamento para {{ $('Configuracao Unidades').first().json.data_agendada }} às {{ $('Configuracao Unidades').first().json.horario_agendado }}. Poderia confirmar a data?\",\n  \"status\": \"nao_encontrado\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -688,
+        2160
+      ],
+      "id": "6c661d2f-5a74-44a9-80d7-8005383ef279",
+      "name": "Resp: Agmt Nao Encontrado Cancelar"
+    },
+    {
+      "parameters": {
+        "tableId": "metricas_ia",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "clinica",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.config_agenda.nome_empresa }}"
+            },
+            {
+              "fieldId": "unidade",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.config_agenda.nome_unidade }}"
+            },
+            {
+              "fieldId": "acao",
+              "fieldValue": "tentativa_cancelamento"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "evento_nao_encontrado"
+            },
+            {
+              "fieldId": "telefone_paciente",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.telefone_limpo }}"
+            },
+            {
+              "fieldId": "detalhes",
+              "fieldValue": "Paciente tentou cancelar data inexistente"
+            },
+            {
+              "fieldId": "nome_paciente",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.nome_paciente }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        2160
+      ],
+      "id": "586644cd-a695-4a29-a3aa-33076967fa2d",
+      "name": "LOG Erro Cancelar",
+      "credentials": {
+        "supabaseApi": {
+          "id": "1I9LSC5dA1mD70Fv",
+          "name": "ANDRE ( DASH CONTACT )"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.clinicorp.com/rest/v1/patient/get",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "subscriber_id",
+              "value": "={{ $('Configuracao Unidades').first().json.config_agenda.subscriber_id }}"
+            },
+            {
+              "name": "Phone",
+              "value": "={{ $('Configuracao Unidades').first().json.telefone_limpo }}"
+            },
+            {
+              "name": "Name",
+              "value": "={{ $json.nome_paciente }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $('Configuracao Unidades').item.json.config_agenda.authorization }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1584,
+        2448
+      ],
+      "id": "3ee42f15-31d7-4673-bf58-e797c7a43804",
+      "name": "Buscar Paciente Remarcar",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const config = $('Configuracao Unidades').first().json;\nconst agmts  = $input.all().map(i => i.json);\nlet enc = null;\nfor (const a of agmts) {\n  if (a.id && a.Deleted !== 'X') { enc = a; break; }  // ← adicionado: a.id\n}\nreturn { json: { ...config,\n  agendamento_id_antigo:    enc ? enc.id : null,\n  agendamento_encontrado:   !!enc,\n  dados_agendamento_antigo: enc || null,\n  data_hora_antiga:         enc ? (enc.AppointmentDate + ' ' + enc.fromTime) : null\n} };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1136,
+        2448
+      ],
+      "id": "b8de4371-7511-4454-b51c-a709b41a5adc",
+      "name": "Filtrar Agmt Antigo"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c0",
+              "leftValue": "={{ $json.agendamento_encontrado }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -912,
+        2448
+      ],
+      "id": "6b7c99df-e65f-4812-9936-11c56f4a7a7c",
+      "name": "Achou o Antigo?"
+    },
+    {
+      "parameters": {
+        "url": "https://api.clinicorp.com/rest/v1/appointment/get_avaliable_times_calendar",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "subscriber_id",
+              "value": "={{ $('Configuracao Unidades').first().json.config_agenda.subscriber_id }}"
+            },
+            {
+              "name": "code_link",
+              "value": "={{ $('Configuracao Unidades').first().json.config_agenda.link_agenda }}"
+            },
+            {
+              "name": "date",
+              "value": "={{ $json.data_agendada }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.config_agenda.authorization }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -688,
+        2352
+      ],
+      "id": "3c80d80c-0d8c-49db-a31d-a63c875d6ada",
+      "name": "Verificar Slots Remarcar",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Validar Slot Remarcar — Prime Dente v2.1 (com bloqueio de feriados) ──\nlet d = {};\ntry { d = $('Configuracao Unidades').first().json; } catch(e) { d = $input.item.json; }\n\nconst TIMEZONE      = d.config_agenda?.timezone || 'America/Sao_Paulo';\nconst PROF_POR_DIA  = d.config_agenda?.profissionais_por_dia || {};\nconst feriados      = new Set(d.config_agenda?.feriados || []);\n\n// ── Bloqueio de feriado ───────────────────────────────────────\nif (feriados.has(d.data_agendada)) {\n  return {\n    json: {\n      ...d,\n      validacao:               { aprovado: false, motivo: 'A clínica não atende neste dia (feriado).' },\n      id_profissional_final:   null,\n      nome_profissional_final: '',\n      hora_buscada:            '',\n      slots_encontrados_total: 0,\n      patient_id_remarcar:     null,\n      agendamento_id_antigo:   null,\n      data_agendada_iso:       null\n    }\n  };\n}\n\n// Resolve profissional pelo dia da NOVA data agendada\nconst dtAlvo    = DateTime.fromISO(d.data_agendada, { zone: TIMEZONE });\nconst profDoDia = PROF_POR_DIA[dtAlvo.weekday] || null;\n\nconst PROF_ID   = profDoDia ? String(profDoDia.id) : '';\nconst PROF_NOME = profDoDia ? profDoDia.nome : 'Profissional';\n\nconst inputItems    = $input.all().map(i => i.json);\nconst isNovoFormato = inputItems.length > 0 && Array.isArray(inputItems[0].AvaliableTimes);\n\nlet slots = [];\nif (isNovoFormato) {\n  slots = (inputItems[0].AvaliableTimes || []).filter(s => s.isSelectable !== false);\n} else {\n  slots = inputItems;\n}\n\nconst norm = h => {\n  if (!h) return '';\n  const p = h.toString().split(':');\n  return p[0].padStart(2,'0') + ':' + (p[1]||'00').padStart(2,'00');\n};\n\nconst hAlvo = norm(d.horario_agendado || '');\nconst slotsNoHorario = slots.filter(s => norm(isNovoFormato ? s.from : s.From) === hAlvo);\nconst slotEscolhido  = slotsNoHorario.find(s =>\n  String(isNovoFormato ? s.professionalId : s.ProfessionalId) === PROF_ID\n);\n\nlet v = { aprovado: false, motivo: 'Horário indisponível.' };\nlet idF = null, nomeF = '';\n\nif (!profDoDia) {\n  v.motivo = 'A clínica não atende neste dia da semana.';\n} else if (!slots.length) {\n  v.motivo = 'Não há agenda aberta ou horários disponíveis neste dia.';\n} else if (!hAlvo) {\n  v.motivo = 'Horário solicitado não informado.';\n} else if (slotEscolhido) {\n  v = { aprovado: true, motivo: 'Horário disponível.' };\n  idF = PROF_ID; nomeF = PROF_NOME;\n} else {\n  v.motivo = `O horário ${d.horario_agendado} não está disponível com ${PROF_NOME}.`;\n}\n\n// Recupera dados anteriores\nlet patientIdRemarcar = null;\ntry { patientIdRemarcar = $('Buscar Paciente Remarcar').first().json.PatientId; } catch(e) {}\n\nlet agendamentoIdAntigo = null;\ntry { agendamentoIdAntigo = $('Filtrar Agmt Antigo').first().json.agendamento_id_antigo; } catch(e) {}\nif (!agendamentoIdAntigo) {\n  try { agendamentoIdAntigo = $('Filtrar Agmt Antigo').first().json.dados_agendamento_antigo?.id || null; } catch(e) {}\n}\n\nconst dataISO = DateTime.fromFormat(\n  d.data_agendada + ' ' + d.horario_agendado,\n  'yyyy-MM-dd HH:mm',\n  { zone: 'America/Sao_Paulo' }\n).toISO();\n\nreturn {\n  json: {\n    ...d,\n    validacao:               v,\n    id_profissional_final:   idF,\n    nome_profissional_final: nomeF,\n    hora_buscada:            hAlvo,\n    slots_encontrados_total: slots.length,\n    patient_id_remarcar:     patientIdRemarcar,\n    agendamento_id_antigo:   agendamentoIdAntigo,\n    data_agendada_iso:       dataISO\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -464,
+        2352
+      ],
+      "id": "5bfc90fd-ca90-49ef-a13a-25a41787110e",
+      "name": "Validar Slot Remarcar"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c0",
+              "leftValue": "={{ $json.validacao.aprovado }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -240,
+        2352
+      ],
+      "id": "fed09b33-9586-45ea-80bc-4710bb7bbe29",
+      "name": "Novo Horario Valido?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"resultado\": \"Agendamento remarcado com sucesso! 🔄\\n\\nEra: {{ $('Filtrar Agmt Antigo').first().json.data_hora_antiga }}\\nFicou para: {{ $('Configuracao Unidades').first().json.data_agendada }} às {{ $('Configuracao Unidades').first().json.horario_agendado }}\",\n  \"status\": \"sucesso\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        656,
+        2064
+      ],
+      "id": "4754bf2d-ad56-4d7e-8810-a36a716f376f",
+      "name": "Resp: Remarcado Sucesso"
+    },
+    {
+      "parameters": {
+        "tableId": "metricas_ia",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "clinica",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.config_agenda.nome_empresa }}"
+            },
+            {
+              "fieldId": "unidade",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.config_agenda.nome_unidade }}"
+            },
+            {
+              "fieldId": "acao",
+              "fieldValue": "remarcacao_realizada"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "sucesso"
+            },
+            {
+              "fieldId": "telefone_paciente",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.telefone_limpo }}"
+            },
+            {
+              "fieldId": "detalhes",
+              "fieldValue": "=Trocou de {{ $('Filtrar Agmt Antigo').first().json.data_hora_antiga }} PARA {{ $('Configuracao Unidades').first().json.data_agendada }} {{ $('Configuracao Unidades').first().json.horario_agendado }}"
+            },
+            {
+              "fieldId": "nome_paciente",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.nome_paciente }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        880,
+        2064
+      ],
+      "id": "e49941b7-116d-4a25-be7f-e6b548e54375",
+      "name": "LOG Sucesso Remarcacao",
+      "credentials": {
+        "supabaseApi": {
+          "id": "1I9LSC5dA1mD70Fv",
+          "name": "ANDRE ( DASH CONTACT )"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"resultado\": \"Não encontrei agendamento no dia {{ DateTime.fromISO($('Configuracao Unidades').first().json.data_antiga_iso).toFormat('dd/MM') }} para remarcar. Poderia confirmar a data atual?\",\n  \"status\": \"agendamento_nao_encontrado\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -688,
+        2544
+      ],
+      "id": "388f345e-52a5-4aa2-a19c-77df70be25c8",
+      "name": "Resp: Antigo Nao Encontrado"
+    },
+    {
+      "parameters": {
+        "tableId": "metricas_ia",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "clinica",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.config_agenda.nome_empresa }}"
+            },
+            {
+              "fieldId": "unidade",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.config_agenda.nome_unidade }}"
+            },
+            {
+              "fieldId": "acao",
+              "fieldValue": "tentativa_remarcacao"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "erro_busca_antigo"
+            },
+            {
+              "fieldId": "telefone_paciente",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.telefone_limpo }}"
+            },
+            {
+              "fieldId": "detalhes",
+              "fieldValue": "=Paciente tentou alterar {{ $('Configuracao Unidades').first().json.data_antiga_iso }} mas não existia."
+            },
+            {
+              "fieldId": "nome_paciente",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.nome_paciente }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        2544
+      ],
+      "id": "9a274d9c-b2f0-44bd-b3b0-e2829ecfe451",
+      "name": "LOG Erro Busca Antigo",
+      "credentials": {
+        "supabaseApi": {
+          "id": "1I9LSC5dA1mD70Fv",
+          "name": "ANDRE ( DASH CONTACT )"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"resultado\": \"Encontrei seu agendamento atual, mas não consegui mudar para o novo horário. Motivo: {{ $json.validacao.motivo }}.\",\n  \"status\": \"erro_validacao_novo\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -16,
+        2448
+      ],
+      "id": "4c441f5c-70ed-40c1-97f7-5dfc975db172",
+      "name": "Resp: Novo Horario Invalido"
+    },
+    {
+      "parameters": {
+        "tableId": "metricas_ia",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "clinica",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.config_agenda.nome_empresa }}"
+            },
+            {
+              "fieldId": "unidade",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.config_agenda.nome_unidade }}"
+            },
+            {
+              "fieldId": "acao",
+              "fieldValue": "tentativa_remarcacao"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "erro_novo_horario_invalido"
+            },
+            {
+              "fieldId": "telefone_paciente",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.telefone_limpo }}"
+            },
+            {
+              "fieldId": "detalhes",
+              "fieldValue": "={{ $json.validacao.motivo }}"
+            },
+            {
+              "fieldId": "nome_paciente",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.nome_paciente }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        208,
+        2448
+      ],
+      "id": "d86cad8e-1e5e-4ba6-9702-d7c3237ee59b",
+      "name": "LOG Erro Novo Horario",
+      "credentials": {
+        "supabaseApi": {
+          "id": "1I9LSC5dA1mD70Fv",
+          "name": "ANDRE ( DASH CONTACT )"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const config = $('Configuracao Unidades').first().json;\nconst agmts  = $input.all().map(i => i.json);\nlet prox = null;\n\nfor (const a of agmts) {\n  if (a.id && a.Deleted !== 'X') { prox = a; break; }  // a.id evita falso positivo do alwaysOutputData\n}\n\nreturn { json: { ...config,\n  proximo_encontrado: !!prox,\n  proximo_data:       prox ? prox.AppointmentDate : null,\n  proximo_hora:       prox ? prox.fromTime : null,\n  proximo_id:         prox ? prox.id : null,\n  dados_proximo:      prox || null\n} };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1136,
+        2832
+      ],
+      "id": "9813459f-b8f1-4c2c-957e-99287497cb53",
+      "name": "Filtrar Proximo Agmt"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c0",
+              "leftValue": "={{ $json.proximo_encontrado }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -912,
+        2832
+      ],
+      "id": "28a7b5c2-4bdb-4173-8069-001ce0b22bc7",
+      "name": "Encontrou Proximo?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"resultado\": \"Sim! ✅ Encontrei seu agendamento para {{ $json.data_agendada }} às {{ $json.proximo_hora }} na {{ $('Configuracao Unidades').first().json.config_agenda.nome_unidade }}.\",\n  \"status\": \"encontrado\",\n  \"data_agendamento\": \"{{ $json.data_agendada }}\",\n  \"hora_agendamento\": \"{{ $json.proximo_hora }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -688,
+        2736
+      ],
+      "id": "1daa71b1-5e44-4d12-b595-9e60c9b93618",
+      "name": "Resp: Agmt Encontrado"
+    },
+    {
+      "parameters": {
+        "tableId": "metricas_ia",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "clinica",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.config_agenda.nome_empresa }}"
+            },
+            {
+              "fieldId": "unidade",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.config_agenda.nome_unidade }}"
+            },
+            {
+              "fieldId": "acao",
+              "fieldValue": "verificacao_agenda_paciente"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "encontrado"
+            },
+            {
+              "fieldId": "telefone_paciente",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.telefone_limpo }}"
+            },
+            {
+              "fieldId": "detalhes",
+              "fieldValue": "=Paciente consultou: {{ $json.proximo_data }} {{ $json.proximo_hora }}"
+            },
+            {
+              "fieldId": "nome_paciente",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.nome_paciente }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        2736
+      ],
+      "id": "e6b362b9-c853-4460-bdac-d865a98e3cca",
+      "name": "LOG Verificar Encontrado",
+      "credentials": {
+        "supabaseApi": {
+          "id": "1I9LSC5dA1mD70Fv",
+          "name": "ANDRE ( DASH CONTACT )"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"resultado\": \"Não encontrei agendamento futuro na {{ $('Configuracao Unidades').first().json.config_agenda.nome_unidade }}. 🤔 Vamos agendar sua avaliação?\",\n  \"status\": \"nao_encontrado\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -688,
+        2928
+      ],
+      "id": "131f4e14-7bb6-4cce-ac08-66bb8a669acc",
+      "name": "Resp: Agmt Nao Encontrado"
+    },
+    {
+      "parameters": {
+        "tableId": "metricas_ia",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "clinica",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.config_agenda.nome_empresa }}"
+            },
+            {
+              "fieldId": "unidade",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.config_agenda.nome_unidade }}"
+            },
+            {
+              "fieldId": "acao",
+              "fieldValue": "verificacao_agenda_paciente"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "nao_encontrado"
+            },
+            {
+              "fieldId": "telefone_paciente",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.telefone_limpo }}"
+            },
+            {
+              "fieldId": "detalhes",
+              "fieldValue": "Paciente não tem avaliação marcada."
+            },
+            {
+              "fieldId": "nome_paciente",
+              "fieldValue": "={{ $('Configuracao Unidades').first().json.nome_paciente }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        2928
+      ],
+      "id": "5f6d0afc-3f96-4b6d-9794-e3e7c7c8ea36",
+      "name": "LOG Verificar Nao Encontrado",
+      "credentials": {
+        "supabaseApi": {
+          "id": "1I9LSC5dA1mD70Fv",
+          "name": "ANDRE ( DASH CONTACT )"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.clinicorp.com/rest/v1/appointment/list",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "subscriber_id",
+              "value": "={{ $('Configuracao Unidades').first().json.config_agenda.subscriber_id }}"
+            },
+            {
+              "name": "from",
+              "value": "={{ DateTime.fromISO($('Configuracao Unidades').item.json.data_antiga).minus({ days: 1 }).toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "to",
+              "value": "={{ DateTime.fromISO($('Configuracao Unidades').item.json.data_antiga).plus({ days: 1 }).toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "businessId",
+              "value": "={{ $('Configuracao Unidades').item.json.config_agenda.business_id }}"
+            },
+            {
+              "name": "patientId",
+              "value": "={{ $json.PatientId }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $('Configuracao Unidades').item.json.config_agenda.authorization }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1360,
+        2448
+      ],
+      "id": "ed45738e-5da2-4bbb-8dd2-1708309d419a",
+      "name": "Listar Agmts Remarcar",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.clinicorp.com/rest/v1/appointment/cancel_appointment",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.config_agenda.authorization }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"subscriber_id\": \"{{ $('Configuracao Unidades').first().json.config_agenda.subscriber_id }}\",\n  \"id\": {{ $json.agendamento_id_antigo }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -16,
+        2064
+      ],
+      "id": "be67e5f0-ea18-4ab1-924e-a75f6b262407",
+      "name": "Cancelar Antigo Remarcar"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Recuperar Reagendamento — Nucleodente ──────────────────────\nconst base = $('Validar Slot Remarcar').first().json;\nconst dur  = base.config_agenda?.duracao_servico || 30;\n\n// ISO da nova data+hora com fuso Brasil\nconst dataISO = DateTime.fromFormat(\n  base.data_agendada + ' ' + base.horario_agendado,\n  'yyyy-MM-dd HH:mm',\n  { zone: 'America/Sao_Paulo' }\n).toISO();\n\n// toTime pré-calculado\nconst toTime = DateTime.fromFormat(base.horario_agendado, 'HH:mm')\n  .plus({ minutes: dur })\n  .toFormat('HH:mm');\n\nreturn {\n  json: {\n    ...base,\n    id_paciente_final: base.patient_id_remarcar,  // já vem do Validar Slot Remarcar\n    data_agendada_iso: dataISO,\n    toTime_calculado:  toTime\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        2064
+      ],
+      "id": "5fc8b6fa-b2c1-4944-96c8-82df390538a0",
+      "name": "Recuperar Reagendamento"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.clinicorp.com/rest/v1/appointment/create_appointment_by_api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.config_agenda.authorization }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"Clinic_BusinessId\": {{ $json.config_agenda.business_id }},\n  \"Patient_PersonId\": {{ $json.id_paciente_final }},\n  \"Dentist_PersonId\": {{ $json.id_profissional_final }},\n  \"PatientName\": \"{{ $('Configuracao Unidades').first().json.nome_paciente }}\",\n  \"MobilePhone\": \"{{ $('Configuracao Unidades').first().json.telefone_limpo }}\",\n  \"date\": \"{{ $json.data_agendada_iso }}\",\n  \"fromTime\": \"{{ $json.horario_agendado }}\",\n  \"toTime\": \"{{ DateTime.fromFormat($json.horario_agendado, 'HH:mm').plus({ minutes: 30 }).toFormat('HH:mm') }}\",\n  \"Notes\": \"Reagendamento realizado via IA (Prime Dente)\",\n  \"CategoryColor\": \"#FFD700\",\n  \"CategoryDescription\": \"Avaliação\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        432,
+        2064
+      ],
+      "id": "5afbfcc9-e124-4d27-a4c0-1f951e0517f4",
+      "name": "Reagendar Clinicorp"
+    },
+    {
+      "parameters": {
+        "url": "https://api.clinicorp.com/rest/v1/patient/get",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "subscriber_id",
+              "value": "={{ $('Configuracao Unidades').first().json.config_agenda.subscriber_id }}"
+            },
+            {
+              "name": "Phone",
+              "value": "={{ $('Configuracao Unidades').first().json.telefone_limpo }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $('Configuracao Unidades').item.json.config_agenda.authorization }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1584,
+        2832
+      ],
+      "id": "c4455c2b-7615-4cb4-9e56-20d58e5aa870",
+      "name": "Buscar Paciente Verificar",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "https://api.clinicorp.com/rest/v1/appointment/list",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "subscriber_id",
+              "value": "={{ $('Configuracao Unidades').first().json.config_agenda.subscriber_id }}"
+            },
+            {
+              "name": "from",
+              "value": "={{ DateTime.fromISO($('Configuracao Unidades').item.json.data_agendada).toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "to",
+              "value": "={{ DateTime.fromISO($('Configuracao Unidades').item.json.data_agendada).toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "businessId",
+              "value": "={{ $('Configuracao Unidades').item.json.config_agenda.business_id }}"
+            },
+            {
+              "name": "patientId",
+              "value": "={{ $json.PatientId }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $('Configuracao Unidades').item.json.config_agenda.authorization }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1360,
+        2832
+      ],
+      "id": "df8b1cd0-c8ec-4950-9f2c-13798f5618c1",
+      "name": "Listar Agmts Verficiar",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "https://api.clinicorp.com/rest/v1/appointment/list",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "subscriber_id",
+              "value": "={{ $('Configuracao Unidades').first().json.config_agenda.subscriber_id }}"
+            },
+            {
+              "name": "from",
+              "value": "={{ $('Configuracao Unidades').item.json.data_agendada }}"
+            },
+            {
+              "name": "to",
+              "value": "={{ DateTime.fromISO($('Configuracao Unidades').item.json.data_agendada).plus({ days: 1 }).toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "businessId",
+              "value": "={{ $('Configuracao Unidades').item.json.config_agenda.business_id }}"
+            },
+            {
+              "name": "patientId",
+              "value": "={{ $json.PatientId }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $('Configuracao Unidades').item.json.config_agenda.authorization }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1360,
+        2064
+      ],
+      "id": "89f4c29d-fa60-42f9-bb5f-ea1c07b2e347",
+      "name": "Listar Agmts Cancelar",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "AGENDAMENTOS-PRIMEDENTE-CLINICORP",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -2256,
+        2064
+      ],
+      "id": "a299fee8-8726-420e-a729-6f94d77b8994",
+      "name": "INICIO",
+      "webhookId": "prime-wh-001"
+    },
+    {
+      "parameters": {
+        "url": "https://api.clinicorp.com/rest/v1/patient/get",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "subscriber_id",
+              "value": "={{ $('Configuracao Unidades').first().json.config_agenda.subscriber_id }}"
+            },
+            {
+              "name": "Name",
+              "value": "={{ $json.nome_paciente }}"
+            },
+            {
+              "name": "Phone",
+              "value": "={{ $json.telefone_limpo }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $('Configuracao Unidades').first().json.config_agenda.authorization }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1584,
+        2064
+      ],
+      "id": "84a6f1fc-1dba-4ef8-8496-745645000cbd",
+      "name": "Buscar Paciente Cancelar",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "let idFinal = null;\nlet telefoneFinal = null;\n\n// 1. Tenta pegar ID do paciente recém-criado\ntry {\n  const novo = $('Criar Novo Paciente').all();\n  if (novo.length > 0) {\n    idFinal = novo[0].json.id || novo[0].json.PatientId || novo[0].json.personId || null;\n  }\n} catch(e) {}\n\n// 2. Fallback: paciente já existente\nif (!idFinal) {\n  try {\n    const exist = $('Buscar Paciente Agendar').all();\n    if (exist.length > 0) {\n      idFinal       = exist[0].json.id || exist[0].json.PatientId || exist[0].json.personId || null;\n      telefoneFinal = exist[0].json.MobilePhone || exist[0].json.Phone || null;\n    }\n  } catch(e) {}\n}\n\nconst base = $('Validar Slot Agendar').first().json;\n\nif (!telefoneFinal) telefoneFinal = base.telefone_limpo;\ntelefoneFinal = telefoneFinal.toString().replace(/\\D/g, '');\n\nconst dur = base.config_agenda?.duracao_servico || 30;\nconst toTime = DateTime.fromFormat(base.horario_agendado, 'HH:mm')\n  .plus({ minutes: dur })\n  .toFormat('HH:mm');\n\nconst spin = $('Configuracao Unidades').first().json.spin;\nconst notes = (spin ? spin + ' | ' : '') + 'Agendamento realizado via IA (Prime Dente)';\n\n// ✅ Body montado aqui para evitar JSON inválido no HTTP node\nconst bodyAgendamento = {\n  Clinic_BusinessId:    base.config_agenda.business_id,\n  Patient_PersonId:     idFinal,\n  Dentist_PersonId:     base.id_profissional_final,\n  PatientName:          base.nome_paciente,\n  MobilePhone:          telefoneFinal,\n  date:                 base.data_agendada,\n  fromTime:             base.horario_agendado,\n  toTime:               toTime,\n  Notes:                notes,\n  CategoryColor:        '#FFD700',\n  CategoryDescription:  'Avaliação'\n};\n\nreturn {\n  json: {\n    ...base,\n    id_paciente_final:   idFinal,\n    telefone_prontuario: telefoneFinal,\n    to_time:             toTime,\n    body_agendamento:    bodyAgendamento  // ✅ body pronto\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        1584
+      ],
+      "id": "e386f383-55c3-4acd-b8f7-77e50158d146",
+      "name": "Unificar ID Paciente"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.clinicorp.com/rest/v1/appointment/create_appointment_by_api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.config_agenda.authorization }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"Clinic_BusinessId\": {{ $json.config_agenda.business_id }},\n  \"Patient_PersonId\": {{ $json.id_paciente_final }},\n  \"Dentist_PersonId\": {{ $json.id_profissional_final }},\n  \"PatientName\": \"{{ $('Configuracao Unidades').first().json.nome_paciente }}\",\n  \"MobilePhone\": \"{{ $json.body_agendamento.MobilePhone }}\",\n  \"date\": \"{{ $json.data_agendada }}\",\n  \"fromTime\": \"{{ $json.horario_agendado }}\",\n  \"toTime\": \"{{ $json.to_time }}\",\n  \"Notes\": \"{{ ($('Configuracao Unidades').first().json.spin ? $('Configuracao Unidades').first().json.spin + ' | ' : '') + 'Agendamento realizado via IA (Prime Dente)' }}\",\n  \"CategoryColor\": \"#FFD700\",\n  \"CategoryDescription\": \"Avaliação\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -16,
+        1584
+      ],
+      "id": "be26f809-9ebe-4073-8b7c-cc4911da7338",
+      "name": "Agendar Na Clinicorp"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "automacao_clinicas",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "helena_company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Configuracao Unidades').first().json.helena_company_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        208,
+        1392
+      ],
+      "id": "pdcrm-a01-config",
+      "name": "CRM Config (Agendar)",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "p1F5hpLgSQHugw7M",
+          "name": "Supa Gabriel"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.wts.chat/chat/v2/session/{{ $('Configuracao Unidades').first().json.id_atendimento }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('CRM Config (Agendar)').first().json.helena_token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        432,
+        1392
+      ],
+      "id": "pdcrm-a02-sessao",
+      "name": "Buscar Sessao (Agendar)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c0",
+              "leftValue": "={{ $json.contactId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        656,
+        1392
+      ],
+      "id": "pdcrm-a03-temcontact",
+      "name": "Tem ContactId? (Agendar)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.wts.chat/core/v1/contact/{{ $('Buscar Sessao (Agendar)').first().json.contactId }}/tags",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('CRM Config (Agendar)').first().json.helena_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"tagIds\": [\"{{ $('CRM Config (Agendar)').first().json.agendado_contact_tag_id }}\"],\n  \"operation\": \"InsertIfNotExists\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        880,
+        1392
+      ],
+      "id": "pdcrm-a04-tag",
+      "name": "Tag Agendou Contato (Agendar)"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.wts.chat/crm/v1/panel/card?PanelId={{ $('CRM Config (Agendar)').first().json.panel_id }}&ContactId={{ $('Buscar Sessao (Agendar)').first().json.contactId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('CRM Config (Agendar)').first().json.helena_token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1104,
+        1392
+      ],
+      "id": "pdcrm-a05-buscarcard",
+      "name": "Buscar Card (Agendar)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('CRM Config (Agendar)').first().json;\nconst cu = $('Configuracao Unidades').first().json;\nconst contactId = $('Buscar Sessao (Agendar)').first().json.contactId;\nconst resp = $('Buscar Card (Agendar)').first().json;\nconst arr = Array.isArray(resp) ? resp : (resp.items ?? resp.data ?? []);\nconst card = (arr && arr.length) ? arr[0] : null;\nconst existTags = card && Array.isArray(card.tagIds) ? card.tagIds : [];\nconst tagIds = Array.from(new Set([...existTags, cfg.ia_card_tag_id].filter(Boolean)));\nconst title = (card && card.title) || cu.nome_paciente || 'Paciente';\n\n// --- Campos personalizados (DATETIME): agendado em = agora; agendado para = data/hora da consulta ---\nconst zone = 'America/Sao_Paulo';\nconst agoraISO = DateTime.now().setZone(zone).toISO();\nconst dtAg = DateTime.fromFormat(`${cu.data_agendada} ${cu.horario_agendado}`, 'yyyy-MM-dd HH:mm', { zone });\nconst paraISO = dtAg.isValid ? dtAg.toISO() : null;\nconst cf = {};\nif (cfg.agendado_em_field_key) cf[cfg.agendado_em_field_key] = [agoraISO];\nif (cfg.agendado_para_field_key && paraISO) cf[cfg.agendado_para_field_key] = [paraISO];\nconst temCF = Object.keys(cf).length > 0;\n\nconst moveBody = { fields: temCF ? ['stepId','tagIds','customFields'] : ['stepId','tagIds'], stepId: cfg.agendado_step_id, tagIds };\nif (temCF) moveBody.customFields = cf;\n\nconst createBody = { stepId: cfg.agendado_step_id, title, contactIds: [contactId], tagIds: cfg.ia_card_tag_id ? [cfg.ia_card_tag_id] : [] };\nif (temCF) createBody.customFields = cf;\n\nreturn [{ json: { hasCard: !!card, cardId: card ? card.id : null, moveBodyJson: JSON.stringify(moveBody), createBodyJson: JSON.stringify(createBody) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        1392
+      ],
+      "id": "pdcrm-a06-montar",
+      "name": "Montar Card (Agendar)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c0",
+              "leftValue": "={{ $json.hasCard }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1552,
+        1392
+      ],
+      "id": "pdcrm-a07-existe",
+      "name": "Card Existe? (Agendar)"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.wts.chat/crm/v2/panel/card/{{ $('Montar Card (Agendar)').first().json.cardId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('CRM Config (Agendar)').first().json.helena_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Montar Card (Agendar)').first().json.moveBodyJson }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1776,
+        1296
+      ],
+      "id": "pdcrm-a08-mover",
+      "name": "Mover Card (Agendar)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.wts.chat/crm/v1/panel/card",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('CRM Config (Agendar)').first().json.helena_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Montar Card (Agendar)').first().json.createBodyJson }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1776,
+        1456
+      ],
+      "id": "pdcrm-a09-criar",
+      "name": "Criar Card (Agendar)"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "automacao_clinicas",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "helena_company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Configuracao Unidades').first().json.helena_company_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        656,
+        2160
+      ],
+      "id": "pdcrm-r01-config",
+      "name": "CRM Config (Remarcar)",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "p1F5hpLgSQHugw7M",
+          "name": "Supa Gabriel"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.wts.chat/chat/v2/session/{{ $('Configuracao Unidades').first().json.id_atendimento }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('CRM Config (Remarcar)').first().json.helena_token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        880,
+        2160
+      ],
+      "id": "pdcrm-r02-sessao",
+      "name": "Buscar Sessao (Remarcar)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c0",
+              "leftValue": "={{ $json.contactId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1104,
+        2160
+      ],
+      "id": "pdcrm-r03-temcontact",
+      "name": "Tem ContactId? (Remarcar)"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.wts.chat/crm/v1/panel/card?PanelId={{ $('CRM Config (Remarcar)').first().json.panel_id }}&ContactId={{ $('Buscar Sessao (Remarcar)').first().json.contactId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('CRM Config (Remarcar)').first().json.helena_token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1328,
+        2160
+      ],
+      "id": "pdcrm-r04-buscarcard",
+      "name": "Buscar Card (Remarcar)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('CRM Config (Remarcar)').first().json;\nconst cu = $('Configuracao Unidades').first().json;\nconst contactId = $('Buscar Sessao (Remarcar)').first().json.contactId;\nconst resp = $('Buscar Card (Remarcar)').first().json;\nconst arr = Array.isArray(resp) ? resp : (resp.items ?? resp.data ?? []);\nconst card = (arr && arr.length) ? arr[0] : null;\nconst existTags = card && Array.isArray(card.tagIds) ? card.tagIds : [];\nconst tagIds = Array.from(new Set([...existTags, cfg.ia_card_tag_id].filter(Boolean)));\nconst title = (card && card.title) || cu.nome_paciente || 'Paciente';\n\n// --- Campos personalizados (DATETIME): agendado em = agora; agendado para = data/hora da consulta ---\nconst zone = 'America/Sao_Paulo';\nconst agoraISO = DateTime.now().setZone(zone).toISO();\nconst dtAg = DateTime.fromFormat(`${cu.data_agendada} ${cu.horario_agendado}`, 'yyyy-MM-dd HH:mm', { zone });\nconst paraISO = dtAg.isValid ? dtAg.toISO() : null;\nconst cf = {};\nif (cfg.agendado_em_field_key) cf[cfg.agendado_em_field_key] = [agoraISO];\nif (cfg.agendado_para_field_key && paraISO) cf[cfg.agendado_para_field_key] = [paraISO];\nconst temCF = Object.keys(cf).length > 0;\n\nconst moveBody = { fields: temCF ? ['stepId','tagIds','customFields'] : ['stepId','tagIds'], stepId: cfg.agendado_step_id, tagIds };\nif (temCF) moveBody.customFields = cf;\n\nconst createBody = { stepId: cfg.agendado_step_id, title, contactIds: [contactId], tagIds: cfg.ia_card_tag_id ? [cfg.ia_card_tag_id] : [] };\nif (temCF) createBody.customFields = cf;\n\nreturn [{ json: { hasCard: !!card, cardId: card ? card.id : null, moveBodyJson: JSON.stringify(moveBody), createBodyJson: JSON.stringify(createBody) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        2160
+      ],
+      "id": "pdcrm-r05-montar",
+      "name": "Montar Card (Remarcar)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c0",
+              "leftValue": "={{ $json.hasCard }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1776,
+        2160
+      ],
+      "id": "pdcrm-r06-existe",
+      "name": "Card Existe? (Remarcar)"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.wts.chat/crm/v2/panel/card/{{ $('Montar Card (Remarcar)').first().json.cardId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('CRM Config (Remarcar)').first().json.helena_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Montar Card (Remarcar)').first().json.moveBodyJson }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2000,
+        2064
+      ],
+      "id": "pdcrm-r07-mover",
+      "name": "Mover Card (Remarcar)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.wts.chat/crm/v1/panel/card",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('CRM Config (Remarcar)').first().json.helena_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Montar Card (Remarcar)').first().json.createBodyJson }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2000,
+        2256
+      ],
+      "id": "pdcrm-r08-criar",
+      "name": "Criar Card (Remarcar)"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "automacao_clinicas",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "helena_company_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Configuracao Unidades').first().json.helena_company_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        2064
+      ],
+      "id": "pdcrm-c01-config",
+      "name": "CRM Config (Cancelar)",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "p1F5hpLgSQHugw7M",
+          "name": "Supa Gabriel"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.wts.chat/chat/v2/session/{{ $('Configuracao Unidades').first().json.id_atendimento }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('CRM Config (Cancelar)').first().json.helena_token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -240,
+        2064
+      ],
+      "id": "pdcrm-c02-sessao",
+      "name": "Buscar Sessao (Cancelar)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c0",
+              "leftValue": "={{ $json.contactId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -16,
+        2064
+      ],
+      "id": "pdcrm-c03-temcontact",
+      "name": "Tem ContactId? (Cancelar)"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.wts.chat/crm/v1/panel/card?PanelId={{ $('CRM Config (Cancelar)').first().json.panel_id }}&ContactId={{ $('Buscar Sessao (Cancelar)').first().json.contactId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('CRM Config (Cancelar)').first().json.helena_token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        208,
+        2064
+      ],
+      "id": "pdcrm-c04-buscarcard",
+      "name": "Buscar Card (Cancelar)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('CRM Config (Cancelar)').first().json;\nconst resp = $('Buscar Card (Cancelar)').first().json;\nconst arr = Array.isArray(resp) ? resp : (resp.items ?? resp.data ?? []);\nconst card = (arr && arr.length) ? arr[0] : null;\nconst moveBody = { fields: ['stepId'], stepId: cfg.cancelado_step_id };\nreturn [{ json: { hasCard: !!card, cardId: card ? card.id : null, moveBodyJson: JSON.stringify(moveBody) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        2064
+      ],
+      "id": "pdcrm-c05-montar",
+      "name": "Montar Card (Cancelar)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c0",
+              "leftValue": "={{ $json.hasCard }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        656,
+        2064
+      ],
+      "id": "pdcrm-c06-existe",
+      "name": "Card Existe? (Cancelar)"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.wts.chat/crm/v2/panel/card/{{ $('Montar Card (Cancelar)').first().json.cardId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('CRM Config (Cancelar)').first().json.helena_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Montar Card (Cancelar)').first().json.moveBodyJson }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        880,
+        2064
+      ],
+      "id": "pdcrm-c07-mover",
+      "name": "Mover Card (Cancelar)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// =============================================================\n// LÓGICA INTELIGENTE — Prime Dente v4.2 (debug + parse robusto)\n// Mudanças vs v4.1: parseDiaSeguro, diagnóstico por dia, output debug.\n// A árvore de decisão A/B/C/D permanece INALTERADA.\n// =============================================================\n\n// ── 1. CONFIGURAÇÃO ───────────────────────────────────────────\nconst cfgNode = $('Configuracao Unidades').first().json;\nconst ca = cfgNode.config_agenda || {};\n\nconst TIMEZONE    = ca.timezone || 'America/Sao_Paulo';\nconst DUR_MIN     = ca.duracao_servico || 10;\nconst LIMITE_DIAS = ca.limite_dias_busca_normal || 7;\nconst GAP_MIN     = 180;\n\nconst PROF_POR_DIA = ca.profissionais_por_dia || {};\n\n// ✅ FIX 2 — parse de data resiliente (ISO, yyyy-MM-dd, dd/MM/yyyy)\nfunction parseDiaSeguro(jsonDate) {\n  if (!jsonDate) return null;\n  let dt = DateTime.fromISO(jsonDate, { zone: TIMEZONE });\n  if (!dt.isValid) dt = DateTime.fromFormat(String(jsonDate).slice(0, 10), 'yyyy-MM-dd', { zone: TIMEZONE });\n  if (!dt.isValid) dt = DateTime.fromFormat(jsonDate, 'dd/MM/yyyy', { zone: TIMEZONE });\n  return dt.isValid ? dt : null;\n}\n\n// ── 2. INPUT ──────────────────────────────────────────────────\nconst diasAPI = $input.all().map(i => i.json);\n\n// ── 3. DADOS DO PEDIDO ────────────────────────────────────────\nconst insistiu = cfgNode.insistiu === true;\n\nconst hPreferidoRaw = cfgNode.horario_preferido;\nconst hPreferido = (hPreferidoRaw && hPreferidoRaw !== 'null' && hPreferidoRaw !== 'undefined')\n  ? hPreferidoRaw : null;\n\nconst hRaw  = cfgNode.horario_agendado || hPreferido || '';\nconst dRaw  = cfgNode.data_agendada || '';\nconst agora = DateTime.now().setZone(TIMEZONE);\n\nlet dtSolicitado = null;\nif (dRaw && hRaw) {\n  dtSolicitado = DateTime.fromFormat(`${dRaw} ${hRaw}`, 'yyyy-MM-dd HH:mm', { zone: TIMEZONE });\n}\n\nlet diffDias = 0, bloqueado = false;\nif (dtSolicitado?.isValid) {\n  diffDias = dtSolicitado.startOf('day').diff(agora.startOf('day'), 'days').days;\n  if (diffDias > LIMITE_DIAS && !insistiu) bloqueado = true;\n}\n\n// ── 4. HELPERS ────────────────────────────────────────────────\nfunction horaParaMin(str) {\n  if (!str) return -1;\n  const p = str.split(':');\n  return parseInt(p[0]) * 60 + parseInt(p[1] || '0');\n}\n\nfunction blocoParaAbsMin(b) {\n  const [yyyy, mm, dd] = b.data.split('-');\n  const diasMs = new Date(parseInt(yyyy), parseInt(mm) - 1, parseInt(dd)).getTime();\n  return Math.floor(diasMs / 60000) + b.minutos;\n}\n\nfunction sugerirComGap(blocos, n = 3, gapMin = GAP_MIN) {\n  const resultado = [];\n  let ultimoAbsMin = -Infinity;\n  for (const b of blocos) {\n    const absMin = blocoParaAbsMin(b);\n    if (absMin - ultimoAbsMin >= gapMin) {\n      resultado.push(b);\n      ultimoAbsMin = absMin;\n      if (resultado.length >= n) break;\n    }\n  }\n  return resultado;\n}\n\nfunction sugerirComGapAncorado(blocos, minAncora, n = 3, gapMin = GAP_MIN) {\n  const ordenados = [...blocos].sort((a, b) =>\n    Math.abs(a.minutos - minAncora) - Math.abs(b.minutos - minAncora)\n  );\n  const resultado = [];\n  for (const b of ordenados) {\n    const respeitaGap = resultado.every(r =>\n      Math.abs(blocoParaAbsMin(r) - blocoParaAbsMin(b)) >= gapMin\n    );\n    if (respeitaGap) {\n      resultado.push(b);\n      if (resultado.length >= n) break;\n    }\n  }\n  return resultado.sort((a, b) => a.minutos - b.minutos);\n}\n\nfunction sugerirPorPreferido(blocos, hPref, n = 3) {\n  const minPref = horaParaMin(hPref);\n  const porDia = {};\n  for (const b of blocos) {\n    if (!porDia[b.data]) {\n      porDia[b.data] = b;\n    } else {\n      if (Math.abs(b.minutos - minPref) < Math.abs(porDia[b.data].minutos - minPref))\n        porDia[b.data] = b;\n    }\n  }\n  return Object.keys(porDia).sort().slice(0, n).map(d => porDia[d]);\n}\n\n// ── 5. PROCESSAR UM DIA (com diagnóstico) ─────────────────────\n// ✅ FIX 3 — retorna { blocos, diag } para expor por que um dia esvaziou\nfunction processarDia(dia) {\n  const dtDia = parseDiaSeguro(dia.jsonDate);\n  const diag = {\n    data:                  dia.jsonDate || null,\n    data_parseou:          !!dtDia,\n    weekday:               dtDia ? dtDia.weekday : null,\n    slots_brutos:          (dia.AvaliableTimes || []).length,\n    slots_selecionaveis:   0,\n    slots_do_profissional: 0,\n    prof_esperado_id:      null,\n    prof_esperado_nome:    null,\n    motivo_descartado:     null\n  };\n\n  if (!dtDia) {\n    diag.motivo_descartado = 'data_nao_parseou';\n    return { blocos: [], diag };\n  }\n\n  const profDoDia = PROF_POR_DIA[dtDia.weekday] || null;\n  if (!profDoDia) {\n    diag.motivo_descartado = 'sem_profissional_no_dia';\n    return { blocos: [], diag };\n  }\n\n  const profId   = String(profDoDia.id);\n  const profNome = profDoDia.nome;\n  diag.prof_esperado_id   = profId;\n  diag.prof_esperado_nome = profNome;\n\n  const selecionaveis = (dia.AvaliableTimes || []).filter(s => s.isSelectable !== false);\n  diag.slots_selecionaveis = selecionaveis.length;\n\n  const blocos = [];\n  for (const slot of selecionaveis) {\n    if (String(slot.professionalId) !== profId) continue;\n    blocos.push({\n      data:        dia.jsonDate,\n      semana:      dia.Week,\n      minutos:     horaParaMin(slot.from),\n      horario:     slot.from,\n      horario_fim: slot.to,\n      profId,\n      profNome\n    });\n  }\n  diag.slots_do_profissional = blocos.length;\n\n  // Classifica o motivo de o dia ter esvaziado (só para debug)\n  if (diag.slots_brutos === 0) {\n    diag.motivo_descartado = 'dia_sem_slots_na_api';\n  } else if (selecionaveis.length === 0) {\n    diag.motivo_descartado = 'todos_slots_nao_selecionaveis';\n  } else if (blocos.length === 0) {\n    diag.motivo_descartado = 'todos_slots_de_outro_profissional';\n  }\n\n  return { blocos: blocos.sort((a, b) => a.minutos - b.minutos), diag };\n}\n\n// ── 6. TODOS OS BLOCOS ────────────────────────────────────────\n// ✅ FIX 1 — coleta diagnóstico por dia\nlet todosBlocos = [];\nconst diagPorDia = [];\nfor (const dia of diasAPI) {\n  const r = processarDia(dia);\n  todosBlocos = todosBlocos.concat(r.blocos);\n  diagPorDia.push(r.diag);\n}\n\n// ── FILTRO FERIADOS ───────────────────────────────────────────\nconst feriados = new Set(ca.feriados || []);\ntodosBlocos = todosBlocos.filter(b => !feriados.has(b.data));\n\nfunction blocosFuturoAPartirDe(dataAlvo) {\n  if (!dataAlvo) return todosBlocos;\n  const futuros = todosBlocos.filter(b => b.data >= dataAlvo);\n  return futuros.length > 0 ? futuros : todosBlocos;\n}\n\n// ── 7. FORMATAÇÃO ─────────────────────────────────────────────\nconst fmtBloco = b => {\n  const [yyyy, mm, dd] = b.data.split('-');\n  return `🗓️ *${dd}/${mm} (${b.semana})* às *${b.horario}* – *${b.horario_fim}* com *${b.profNome}*`;\n};\n\nconst dtLabel = dtSolicitado?.isValid\n  ? dtSolicitado.setLocale('pt-BR').toFormat('dd/MM (cccc)')\n  : (dRaw || 'data solicitada');\n\nconst prefLabel = hPreferido\n  ? `\\n\\n💡 _Priorizei horários próximos à sua preferência: *${hPreferido}*_`\n  : '';\n\n// ── 8. DECISÃO PRINCIPAL ──────────────────────────────────────\nlet resultado, exactMatch = false;\nconst sugestoesHorarios = [];\nlet blocosSugeridos = [];\n\n// CAMINHO A — Data distante + NÃO insistiu\nif (bloqueado) {\n  blocosSugeridos = hPreferido\n    ? sugerirPorPreferido(todosBlocos, hPreferido, 3)\n    : sugerirComGap(todosBlocos, 3);\n  if (blocosSugeridos.length === 0) {\n    resultado = `😕 Não há horários disponíveis no momento. Posso verificar outra data?`;\n  } else {\n    blocosSugeridos.forEach(b => sugestoesHorarios.push(`${b.data} ${b.horario}`));\n    resultado =\n      `⚠️ A data que você pediu (*${dtLabel}*) está a *${Math.ceil(diffDias)} dias* de hoje.\\n\\n` +\n      `Para garantir um atendimento mais rápido, separei os primeiros horários disponíveis:${prefLabel}\\n\\n` +\n      blocosSugeridos.map(fmtBloco).join('\\n');\n  }\n}\n// CAMINHO B — Data distante + insistiu\nelse if (diffDias > LIMITE_DIAS && insistiu) {\n  const dataAlvo      = dtSolicitado.toFormat('yyyy-MM-dd');\n  const minSolicitado = (hRaw && hRaw !== '00:00') ? horaParaMin(hRaw) : -1;\n  const blocosDoDia   = todosBlocos.filter(b => b.data === dataAlvo);\n  const blocoExato    = minSolicitado >= 0 ? blocosDoDia.find(b => b.minutos === minSolicitado) : null;\n\n  if (blocoExato) {\n    exactMatch = true;\n    blocosSugeridos = [blocoExato];\n    sugestoesHorarios.push(`${blocoExato.data} ${blocoExato.horario}`);\n    resultado = `✅ Consegui o horário que você pediu!\\n\\n${fmtBloco(blocoExato)}\\n\\nConfirmo o agendamento?`;\n  } else if (blocosDoDia.length === 0) {\n    const ehFeriado = feriados.has(dataAlvo);\n    const futuros = blocosFuturoAPartirDe(dataAlvo);\n    blocosSugeridos = hPreferido\n      ? sugerirPorPreferido(futuros, hPreferido, 3)\n      : sugerirComGap(futuros, 3);\n    blocosSugeridos.forEach(b => sugestoesHorarios.push(`${b.data} ${b.horario}`));\n    const motivoIndisponivel = ehFeriado\n      ? `😕 O dia *${dtLabel}* é feriado e a clínica não atende.`\n      : `😕 Não há horários disponíveis em *${dtLabel}*.`;\n    resultado =\n      `${motivoIndisponivel}\\n\\nSeparei os primeiros horários disponíveis a partir dessa data:${prefLabel}\\n\\n` +\n      blocosSugeridos.map(fmtBloco).join('\\n') + `\\n\\nQual prefere? Ou verifico outro dia?`;\n  } else {\n    blocosSugeridos = minSolicitado >= 0\n      ? sugerirComGapAncorado(blocosDoDia, minSolicitado, 3)\n      : sugerirComGap(blocosDoDia, 3);\n    blocosSugeridos.forEach(b => sugestoesHorarios.push(`${b.data} ${b.horario}`));\n    resultado =\n      `O horário das *${hRaw}* não está disponível em *${dtLabel}*, mas encontrei estas opções neste mesmo dia:${prefLabel}\\n\\n` +\n      blocosSugeridos.map(fmtBloco).join('\\n') + `\\n\\nQual prefere? Ou verifico outro dia?`;\n  }\n}\n// CAMINHOS C / D — Data normal (≤ 7 dias)\nelse {\n  const dataAlvo      = dtSolicitado?.isValid ? dtSolicitado.toFormat('yyyy-MM-dd') : null;\n  const minSolicitado = (hRaw && hRaw !== '00:00') ? horaParaMin(hRaw) : -1;\n\n  if (dataAlvo && feriados.has(dataAlvo)) {\n    const futuros = blocosFuturoAPartirDe(dataAlvo);\n    blocosSugeridos = hPreferido\n      ? sugerirPorPreferido(futuros, hPreferido, 3)\n      : sugerirComGap(futuros, 3);\n    blocosSugeridos.forEach(b => sugestoesHorarios.push(`${b.data} ${b.horario}`));\n    if (blocosSugeridos.length === 0) {\n      resultado = `😕 O dia *${dtLabel}* é feriado e não há outros horários disponíveis no período. Posso verificar outra data?`;\n    } else {\n      resultado =\n        `😕 O dia *${dtLabel}* é feriado e a clínica não atende.\\n\\nSeparei os próximos horários disponíveis:${prefLabel}\\n\\n` +\n        blocosSugeridos.map(fmtBloco).join('\\n') + `\\n\\nQual desses fica melhor para você?`;\n    }\n  } else {\n    const blocosDoDia = dataAlvo ? todosBlocos.filter(b => b.data === dataAlvo) : todosBlocos;\n    const blocoExato  = (minSolicitado >= 0 && blocosDoDia.length > 0)\n      ? blocosDoDia.find(b => b.minutos === minSolicitado) : null;\n\n    if (blocoExato) {\n      exactMatch = true;\n      blocosSugeridos = [blocoExato];\n      sugestoesHorarios.push(`${blocoExato.data} ${blocoExato.horario}`);\n      resultado =\n        `✅ Ótima notícia! O horário *${dtLabel} às ${blocoExato.horario}* está disponível ` +\n        `com *${blocoExato.profNome}*.\\n\\nPosso confirmar sua avaliação?`;\n    } else if (blocosDoDia.length === 0) {\n      const futuros = blocosFuturoAPartirDe(dataAlvo);\n      blocosSugeridos = hPreferido\n        ? sugerirPorPreferido(futuros, hPreferido, 3)\n        : sugerirComGap(futuros, 3);\n      if (blocosSugeridos.length === 0) {\n        resultado = `😕 Não há horários disponíveis no período consultado. Posso verificar outras datas?`;\n      } else {\n        blocosSugeridos.forEach(b => sugestoesHorarios.push(`${b.data} ${b.horario}`));\n        resultado =\n          `😕 Não há horários disponíveis em *${dtLabel}*.\\n\\nSeparei os primeiros horários disponíveis a partir dessa data:${prefLabel}\\n\\n` +\n          blocosSugeridos.map(fmtBloco).join('\\n') + `\\n\\nQual desses fica melhor para você?`;\n      }\n    } else {\n      blocosSugeridos = minSolicitado >= 0\n        ? sugerirComGapAncorado(blocosDoDia, minSolicitado, 3)\n        : sugerirComGap(blocosDoDia, 3);\n      blocosSugeridos.forEach(b => sugestoesHorarios.push(`${b.data} ${b.horario}`));\n      const intro = minSolicitado >= 0\n        ? `O horário das *${hRaw}* não está disponível para *${dtLabel}*, mas encontrei estas opções:`\n        : `Encontrei os seguintes horários disponíveis para *${dtLabel}*:`;\n      resultado = `📅 ${intro}${prefLabel}\\n\\n` + blocosSugeridos.map(fmtBloco).join('\\n') + `\\n\\nQual desses fica melhor para você?`;\n    }\n  }\n}\n\n// ── 9. OUTPUT ─────────────────────────────────────────────────\nconst profNomeFinal = blocosSugeridos.length > 0 ? blocosSugeridos[0].profNome : '';\n\nreturn {\n  json: {\n    resultado,\n    sugestoes_horarios:      sugestoesHorarios,\n    profissional_nome:       profNomeFinal,\n    data_distante_bloqueada: bloqueado,\n    exact_match:             exactMatch,\n    diff_dias:               Math.ceil(diffDias),\n    total_dias_api:          diasAPI.length,\n    total_blocos_validos:    todosBlocos.length,\n\n    // ── DEBUG (fixes 1 e 3) — remover depois de diagnosticar ──\n    debug_dias_api:       diasAPI.map(d => d.jsonDate || null),\n    debug_blocos_por_dia: diagPorDia,\n    debug_resumo:         diagPorDia.map(d =>\n      `${d.data}: bruto=${d.slots_brutos} sel=${d.slots_selecionaveis} prof=${d.slots_do_profissional}` +\n      (d.motivo_descartado ? ` [${d.motivo_descartado}]` : '')\n    )\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1360,
+        1392
+      ],
+      "id": "bdaec1ef-ab97-43e8-bfec-b83d043d8de6",
+      "name": "Logica Inteligente"
+    }
+  ],
+  "connections": {
+    "Configuracao Unidades": {
+      "main": [
+        [
+          {
+            "node": "Guarda de Transito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guarda de Transito": {
+      "main": [
+        [
+          {
+            "node": "Verificar Agenda Disponibilidade",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Verificar Agenda Agendar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar Paciente Cancelar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar Paciente Remarcar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar Paciente Verificar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Agenda Disponibilidade": {
+      "main": [
+        [
+          {
+            "node": "Logica Inteligente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resp: Disponibilidade": {
+      "main": [
+        [
+          {
+            "node": "LOG Disponibilidade",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Agenda Agendar": {
+      "main": [
+        [
+          {
+            "node": "Validar Slot Agendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar Slot Agendar": {
+      "main": [
+        [
+          {
+            "node": "Slot Valido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slot Valido?": {
+      "main": [
+        [
+          {
+            "node": "Buscar Paciente Agendar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resp: Erro ao Agendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resp: Erro ao Agendar": {
+      "main": [
+        [
+          {
+            "node": "LOG Erro Agendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Paciente Agendar": {
+      "main": [
+        [
+          {
+            "node": "Paciente Existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Paciente Existe?": {
+      "main": [
+        [
+          {
+            "node": "Unificar ID Paciente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Criar Novo Paciente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar Novo Paciente": {
+      "main": [
+        [
+          {
+            "node": "Unificar ID Paciente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resp: Sucesso Agendamento": {
+      "main": [
+        [
+          {
+            "node": "LOG Sucesso Agendamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar Agmt Cancelar": {
+      "main": [
+        [
+          {
+            "node": "Achou Para Cancelar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Achou Para Cancelar?": {
+      "main": [
+        [
+          {
+            "node": "Cancelar Na Clinicorp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resp: Agmt Nao Encontrado Cancelar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancelar Na Clinicorp": {
+      "main": [
+        [
+          {
+            "node": "Resp: Cancelamento Feito",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "CRM Config (Cancelar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resp: Cancelamento Feito": {
+      "main": [
+        [
+          {
+            "node": "LOG Sucesso Cancelamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resp: Agmt Nao Encontrado Cancelar": {
+      "main": [
+        [
+          {
+            "node": "LOG Erro Cancelar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Paciente Remarcar": {
+      "main": [
+        [
+          {
+            "node": "Listar Agmts Remarcar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar Agmt Antigo": {
+      "main": [
+        [
+          {
+            "node": "Achou o Antigo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Achou o Antigo?": {
+      "main": [
+        [
+          {
+            "node": "Verificar Slots Remarcar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resp: Antigo Nao Encontrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Slots Remarcar": {
+      "main": [
+        [
+          {
+            "node": "Validar Slot Remarcar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar Slot Remarcar": {
+      "main": [
+        [
+          {
+            "node": "Novo Horario Valido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Novo Horario Valido?": {
+      "main": [
+        [
+          {
+            "node": "Cancelar Antigo Remarcar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resp: Novo Horario Invalido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resp: Remarcado Sucesso": {
+      "main": [
+        [
+          {
+            "node": "LOG Sucesso Remarcacao",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resp: Antigo Nao Encontrado": {
+      "main": [
+        [
+          {
+            "node": "LOG Erro Busca Antigo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resp: Novo Horario Invalido": {
+      "main": [
+        [
+          {
+            "node": "LOG Erro Novo Horario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar Proximo Agmt": {
+      "main": [
+        [
+          {
+            "node": "Encontrou Proximo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Encontrou Proximo?": {
+      "main": [
+        [
+          {
+            "node": "Resp: Agmt Encontrado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resp: Agmt Nao Encontrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resp: Agmt Encontrado": {
+      "main": [
+        [
+          {
+            "node": "LOG Verificar Encontrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resp: Agmt Nao Encontrado": {
+      "main": [
+        [
+          {
+            "node": "LOG Verificar Nao Encontrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Listar Agmts Remarcar": {
+      "main": [
+        [
+          {
+            "node": "Filtrar Agmt Antigo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancelar Antigo Remarcar": {
+      "main": [
+        [
+          {
+            "node": "Recuperar Reagendamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recuperar Reagendamento": {
+      "main": [
+        [
+          {
+            "node": "Reagendar Clinicorp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reagendar Clinicorp": {
+      "main": [
+        [
+          {
+            "node": "Resp: Remarcado Sucesso",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "CRM Config (Remarcar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Paciente Verificar": {
+      "main": [
+        [
+          {
+            "node": "Listar Agmts Verficiar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Listar Agmts Verficiar": {
+      "main": [
+        [
+          {
+            "node": "Filtrar Proximo Agmt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Listar Agmts Cancelar": {
+      "main": [
+        [
+          {
+            "node": "Filtrar Agmt Cancelar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "INICIO": {
+      "main": [
+        [
+          {
+            "node": "Configuracao Unidades",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Paciente Cancelar": {
+      "main": [
+        [
+          {
+            "node": "Listar Agmts Cancelar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unificar ID Paciente": {
+      "main": [
+        [
+          {
+            "node": "Agendar Na Clinicorp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agendar Na Clinicorp": {
+      "main": [
+        [
+          {
+            "node": "Resp: Sucesso Agendamento",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "CRM Config (Agendar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRM Config (Agendar)": {
+      "main": [
+        [
+          {
+            "node": "Buscar Sessao (Agendar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Sessao (Agendar)": {
+      "main": [
+        [
+          {
+            "node": "Tem ContactId? (Agendar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem ContactId? (Agendar)": {
+      "main": [
+        [
+          {
+            "node": "Tag Agendou Contato (Agendar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag Agendou Contato (Agendar)": {
+      "main": [
+        [
+          {
+            "node": "Buscar Card (Agendar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Card (Agendar)": {
+      "main": [
+        [
+          {
+            "node": "Montar Card (Agendar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar Card (Agendar)": {
+      "main": [
+        [
+          {
+            "node": "Card Existe? (Agendar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Card Existe? (Agendar)": {
+      "main": [
+        [
+          {
+            "node": "Mover Card (Agendar)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Criar Card (Agendar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRM Config (Remarcar)": {
+      "main": [
+        [
+          {
+            "node": "Buscar Sessao (Remarcar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Sessao (Remarcar)": {
+      "main": [
+        [
+          {
+            "node": "Tem ContactId? (Remarcar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem ContactId? (Remarcar)": {
+      "main": [
+        [
+          {
+            "node": "Buscar Card (Remarcar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Card (Remarcar)": {
+      "main": [
+        [
+          {
+            "node": "Montar Card (Remarcar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar Card (Remarcar)": {
+      "main": [
+        [
+          {
+            "node": "Card Existe? (Remarcar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Card Existe? (Remarcar)": {
+      "main": [
+        [
+          {
+            "node": "Mover Card (Remarcar)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Criar Card (Remarcar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRM Config (Cancelar)": {
+      "main": [
+        [
+          {
+            "node": "Buscar Sessao (Cancelar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Sessao (Cancelar)": {
+      "main": [
+        [
+          {
+            "node": "Tem ContactId? (Cancelar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem ContactId? (Cancelar)": {
+      "main": [
+        [
+          {
+            "node": "Buscar Card (Cancelar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Card (Cancelar)": {
+      "main": [
+        [
+          {
+            "node": "Montar Card (Cancelar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar Card (Cancelar)": {
+      "main": [
+        [
+          {
+            "node": "Card Existe? (Cancelar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Card Existe? (Cancelar)": {
+      "main": [
+        [
+          {
+            "node": "Mover Card (Cancelar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Logica Inteligente": {
+      "main": [
+        [
+          {
+            "node": "Resp: Disponibilidade",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "INICIO": [
+      {
+        "action": "verificar_disponibilidade",
+        "data_inicio": "2026-07-20",
+        "horario_preferido": "",
+        "nome_cliente": "",
+        "telefone_cliente": "",
+        "insistiu": "False",
+        "unidade": "Meier"
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d1a2ea4f12ae9ebd3132590ec74e61784d3b49e17967bcb70d511f83551a7c49"
+  }
+}

@@ -26,3 +26,6 @@ build/
 *.tmp
 Thumbs.db
 .DS_Store
+
+# Projetos (repositorios proprios / trabalho local)
+02_Projetos/

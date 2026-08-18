@@ -1,0 +1,593 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-novo-atos-odontologia",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -3872,
+        192
+      ],
+      "id": "6c2e272b-881c-45ec-af9e-4231f870fe54",
+      "name": "Webhook Lead",
+      "webhookId": "lead-etiqueta-generico"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Evento SESSION_NEW (lead novo): dados em body.content. Também aceita o formato antigo.\nconst b = $input.first().json.body ?? $input.first().json;\nconst c = b.content ?? b;\n\nconst companyId = c.companyId ?? b.companyId ?? null;\nconst contactId = c.contactId ?? c.contactDetails?.id ?? c.contact?.id ?? null;\nconst contactName = c.contactDetails?.name ?? c.contact?.name ?? 'Sem nome';\nconst sessionId = c.id ?? c.sessionId ?? c.session?.id ?? null;\nconst platform = (c.channelDetails?.platform ?? c.channel?.platform ?? c.channelType ?? '').toString().toUpperCase();\nconst utm = c.utm ?? c.session?.utm ?? null;\nconst utmSource = (utm && utm.source) ? String(utm.source).toUpperCase() : null;\nconst headline = (utm && utm.headline) ? utm.headline : null;\nconst lastContactMessage = c.lastMessageText ?? c.lastContactMessage ?? c.lastMessagesAggregated?.text ?? '';\n\nconst origemRaw = (utmSource ?? platform ?? 'DESCONHECIDO');\nlet origem;\nif (origemRaw.includes('INSTAGRAM')) origem = 'INSTAGRAM';\nelse if (origemRaw.includes('FACEBOOK')) origem = 'FACEBOOK';\nelse origem = 'ORGANICO';\n\nconst agora = new Date();\nconst dataEntrada = agora.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });\nconst horaEntrada = agora.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });\n\nlet descricao = `Entrada: ${dataEntrada} às ${horaEntrada}`;\nif (headline) descricao += `\\nCampanha: ${headline}`;\n\nreturn [{ json: { companyId, contactId, contactName, sessionId, platform, utmSource, origem, headline, lastContactMessage, dataEntrada, horaEntrada, descricao } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3648,
+        192
+      ],
+      "id": "99e9e183-b9a7-40ba-aca8-7ae16a74031c",
+      "name": "Preparar Dados"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "automacao_clinicas",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "helena_company_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.companyId }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -3424,
+        192
+      ],
+      "id": "bd181725-8073-4a4f-a228-dfa8c02a3647",
+      "name": "Buscar Config",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "p1F5hpLgSQHugw7M",
+          "name": "Supa Gabriel"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Junta a linha (config achatada da clínica) com os dados preparados.\n// 'alwaysOutputData' no node Supabase garante 1 item mesmo sem match.\nconst prep = $('Preparar Dados').first().json;\nconst row = $input.first().json || {};\n\nconst ativoBool = (row.ativo === true || String(row.ativo).toLowerCase() === 'true');\nif (!row.helena_company_id || !ativoBool) {\n  return [{ json: { ...prep, found: false } }];\n}\n\nconst mapaPorOrigem = {\n  FACEBOOK:  { tag_nome: row.fb_tag_nome,  panel_tag_id: row.fb_panel_tag_id,  contact_tag_id: row.fb_contact_tag_id },\n  INSTAGRAM: { tag_nome: row.ig_tag_nome,  panel_tag_id: row.ig_panel_tag_id,  contact_tag_id: row.ig_contact_tag_id },\n  ORGANICO:  { tag_nome: row.org_tag_nome, panel_tag_id: row.org_panel_tag_id, contact_tag_id: row.org_contact_tag_id }\n};\nconst temOrigem = !!(mapaPorOrigem[prep.origem] && mapaPorOrigem[prep.origem].panel_tag_id);\nconst mapa = (temOrigem ? mapaPorOrigem[prep.origem] : mapaPorOrigem['ORGANICO']) || {};\n\n// Valida GUID: só conta como etiqueta válida se for um UUID de verdade (evita 500 'System.Guid').\nconst guidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst contact_tag_id = guidRe.test(String(mapa.contact_tag_id || '')) ? mapa.contact_tag_id : null;\nconst panel_tag_id   = guidRe.test(String(mapa.panel_tag_id   || '')) ? mapa.panel_tag_id   : null;\n\nreturn [{ json: {\n  ...prep,\n  found: true,\n  clinica_nome: row.nome,\n  token: row.helena_token,\n  panel_id: row.panel_id,\n  step_id: row.step_id,\n  origem_aplicada: temOrigem ? prep.origem : 'ORGANICO',\n  tag_nome: mapa.tag_nome ?? null,\n  panel_tag_id,\n  contact_tag_id,\n  tem_contact_tag: !!contact_tag_id,\n  tem_panel_tag: !!panel_tag_id\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3200,
+        192
+      ],
+      "id": "0b54469a-e8c6-41b6-8aea-f7f538ac36b1",
+      "name": "Resolver Config"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-found",
+              "leftValue": "={{ $json.found }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -2976,
+        192
+      ],
+      "id": "ebd191f2-7216-4873-9700-58224d2a50e5",
+      "name": "Config Existe?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-hastag",
+              "leftValue": "={{ $('Resolver Config').first().json.tem_contact_tag }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -2752,
+        96
+      ],
+      "id": "d32c3188-7350-41f3-ba6a-5642812c978f",
+      "name": "Tem etiqueta contato?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.wts.chat/core/v1/contact/{{ $('Resolver Config').first().json.contactId }}/tags",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Resolver Config').first().json.token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"tagIds\": [\"{{ $('Resolver Config').first().json.contact_tag_id }}\"],\n  \"operation\": \"InsertIfNotExists\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -2528,
+        32
+      ],
+      "id": "8c323306-63bf-4d34-ae19-9b9bd6c535a8",
+      "name": "Etiqueta Contato",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.wts.chat/crm/v1/panel/card?PanelId={{ $('Resolver Config').first().json.panel_id }}&ContactId={{ $('Resolver Config').first().json.contactId }}&IncludeArchived=false&OrderBy=CreatedAt&OrderDirection=DESCENDING&PageSize=5",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Resolver Config').first().json.token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -2304,
+        96
+      ],
+      "id": "977c661d-d7fe-4fbe-b1fb-12f9c8dc6a41",
+      "name": "Buscar Card Existente",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nconst arr = Array.isArray(resp) ? resp : (resp.items ?? resp.data ?? resp.cards ?? []);\nconst hasCard = Array.isArray(arr) && arr.length > 0;\nconst cardId = hasCard ? (arr[0].id ?? arr[0].cardId ?? null) : null;\nreturn [{ json: { hasCard, cardId } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2080,
+        96
+      ],
+      "id": "2bc60876-2b2c-41e3-b1d9-3924b02e34b3",
+      "name": "Tem Card?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-hascard",
+              "leftValue": "={{ $json.hasCard }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1856,
+        96
+      ],
+      "id": "bffdbbff-02b2-4b99-af18-5d15df4211d5",
+      "name": "Card Existe?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.wts.chat/crm/v1/panel/card/{{ $('Tem Card?').first().json.cardId }}/note",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Resolver Config').first().json.token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": {{ JSON.stringify('Lead voltou a interagir em ' + $('Resolver Config').first().json.dataEntrada + ' às ' + $('Resolver Config').first().json.horaEntrada + '\\nOrigem: ' + $('Resolver Config').first().json.origem_aplicada + '\\nMensagem: ' + ($('Resolver Config').first().json.lastContactMessage || '')) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1632,
+        0
+      ],
+      "id": "e9658b3b-d482-4583-9563-8278208bcabc",
+      "name": "Adicionar Anotacao",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.wts.chat/crm/v1/panel/card",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Resolver Config').first().json.token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"panelId\": \"{{ $('Resolver Config').first().json.panel_id }}\",\n  \"stepId\": \"{{ $('Resolver Config').first().json.step_id }}\",\n  \"title\": {{ JSON.stringify($('Resolver Config').first().json.contactName) }},\n  \"description\": {{ JSON.stringify($('Resolver Config').first().json.descricao) }},\n  \"contactIds\": [\"{{ $('Resolver Config').first().json.contactId }}\"],\n  \"tagIds\": {{ $('Resolver Config').first().json.panel_tag_id ? JSON.stringify([$('Resolver Config').first().json.panel_tag_id]) : '[]' }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1632,
+        192
+      ],
+      "id": "1b9af212-9978-4e69-895d-3752c561fb40",
+      "name": "Criar Card",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"ok\",\n  \"clinica\": \"{{ $('Resolver Config').first().json.clinica_nome }}\",\n  \"acao\": \"{{ $('Tem Card?').first().json.hasCard ? 'anotacao' : 'card_criado' }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -1408,
+        96
+      ],
+      "id": "e2fe1af5-2ceb-443f-b2f8-e81ff5e9c166",
+      "name": "Responder OK"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"ignorado\",\n  \"motivo\": \"clinica nao cadastrada ou inativa\",\n  \"companyId\": \"{{ $('Preparar Dados').first().json.companyId }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -2752,
+        288
+      ],
+      "id": "35258960-933c-48a8-9520-e9d959871863",
+      "name": "Responder Nao Configurado"
+    }
+  ],
+  "connections": {
+    "Webhook Lead": {
+      "main": [
+        [
+          {
+            "node": "Preparar Dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Dados": {
+      "main": [
+        [
+          {
+            "node": "Buscar Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Config": {
+      "main": [
+        [
+          {
+            "node": "Resolver Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolver Config": {
+      "main": [
+        [
+          {
+            "node": "Config Existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config Existe?": {
+      "main": [
+        [
+          {
+            "node": "Tem etiqueta contato?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder Nao Configurado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem etiqueta contato?": {
+      "main": [
+        [
+          {
+            "node": "Etiqueta Contato",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar Card Existente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Etiqueta Contato": {
+      "main": [
+        [
+          {
+            "node": "Buscar Card Existente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Card Existente": {
+      "main": [
+        [
+          {
+            "node": "Tem Card?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem Card?": {
+      "main": [
+        [
+          {
+            "node": "Card Existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Card Existe?": {
+      "main": [
+        [
+          {
+            "node": "Adicionar Anotacao",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Criar Card",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adicionar Anotacao": {
+      "main": [
+        [
+          {
+            "node": "Responder OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar Card": {
+      "main": [
+        [
+          {
+            "node": "Responder OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "Webhook Lead": [
+      {
+        "headers": {
+          "host": "webhook.dentistapower.com.br",
+          "content-length": "2115",
+          "content-type": "application/json; charset=utf-8",
+          "x-forwarded-for": "18.215.79.89",
+          "x-forwarded-host": "webhook.dentistapower.com.br",
+          "x-forwarded-port": "443",
+          "x-forwarded-proto": "https",
+          "x-forwarded-server": "7b7aec13661d",
+          "x-real-ip": "18.215.79.89",
+          "accept-encoding": "gzip"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "eventType": "SESSION_NEW",
+          "date": "2026-07-24T06:13:19.4078136Z",
+          "content": {
+            "id": "7e21dfa6-d2d7-45d8-bbec-5a03def6d281",
+            "createdAt": "2026-07-24T06:13:12.8555402Z",
+            "updatedAt": "2026-07-24T06:13:12.8555402Z",
+            "active": true,
+            "number": "2026072400001",
+            "startAt": "2026-07-24T06:13:12.8555403Z",
+            "endAt": null,
+            "firstUserInteractionAt": null,
+            "firstAgentMessageAt": null,
+            "status": "PENDING",
+            "contactId": "528397b0-7b7b-4b04-88ff-b034d6fd5305",
+            "contactDetails": {
+              "id": "528397b0-7b7b-4b04-88ff-b034d6fd5305",
+              "name": "Gabriel",
+              "email": null,
+              "pictureUrl": "https://cdn.flw.chat/upload/79a15d58-9d7b-4420-a75e-985267e9c8ed/IMAGE/275d414_20260724061313169_361704ca_a3b8_4a9f_825f_f250cecdd5e1_2026_07_24_06_13.jpg?AWSAccessKeyId=AKIAZUM25FKLBHOEDFGZ&Expires=1942639994&response-content-disposition=inline&Signature=OK%2BFQ4PUrCOjWw%2BLnFnetviLfj4%3D",
+              "phonenumber": "+55|62981878291",
+              "instagram": null,
+              "phonenumberFormatted": "(62) 98187-8291",
+              "tagsId": [],
+              "status": "ACTIVE",
+              "tagsName": []
+            },
+            "channelId": "f39ff752-682b-4506-9f05-2f7f121a3405",
+            "channelType": "ZAPI_WHATSAPP",
+            "channelDetails": {
+              "id": "(62) 3193-0175",
+              "platform": "WhatsApp",
+              "provider": "Z-API",
+              "providerVariable": "Integrado",
+              "pictureUrl": "https://cdn.flw.chat/static/whatsapp-mini.png",
+              "displayName": "Instância 196400"
+            },
+            "companyId": "79a15d58-9d7b-4420-a75e-985267e9c8ed",
+            "departmentId": "10238c3f-d8a3-4d65-b6a6-2c76ceb7604d",
+            "departmentDetails": {
+              "id": "10238c3f-d8a3-4d65-b6a6-2c76ceb7604d",
+              "companyId": "79a15d58-9d7b-4420-a75e-985267e9c8ed",
+              "name": "Comercial",
+              "description": null
+            },
+            "userId": null,
+            "botId": null,
+            "botVersionId": null,
+            "agentDetails": null,
+            "previousSessionId": null,
+            "readTimestamp": null,
+            "waitReply": false,
+            "expired": false,
+            "windowStatus": "ACTIVE",
+            "lastInteractionDate": "2026-07-24T06:13:12.8555402Z",
+            "lastMessageOut": null,
+            "lastMessageIn": "2026-07-24T06:13:11Z",
+            "lastMessageText": null,
+            "unreadCount": 0,
+            "previewUrl": "https://app.fluxodonto.com/redirect?type=SESSION&id=7e21dfa6-d2d7-45d8-bbec-5a03def6d281",
+            "utm": null,
+            "classification": null,
+            "metadata": null
+          },
+          "changeMetadata": {
+            "source": "SYSTEM",
+            "userId": "00000000-0000-0000-0000-000000000000",
+            "changes": null
+          }
+        },
+        "webhookUrl": "https://webhook.dentistapower.com.br/webhook/lead-novo-atos-odontologia",
+        "executionMode": "production"
+      }
+    ]
+  },
+  "meta": {
+    "instanceId": "d1a2ea4f12ae9ebd3132590ec74e61784d3b49e17967bcb70d511f83551a7c49"
+  }
+}

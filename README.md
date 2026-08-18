@@ -8,11 +8,11 @@ Base de conhecimento e ativos de trabalho para construção de **agentes de IA d
 
 | Pasta | Conteúdo |
 |---|---|
-| `01_Clinicas/` | Entregas por clínica, organizadas por mês (briefing, prompts dos estágios E0–E12, banco de conhecimento em CSV, workflows n8n). Ex: OB Clinic (Gi), Vassoler (Karol) |
-| `02_Projetos/` | Projetos de código: dashboards financeiros (React/Next.js + Clinicorp), sistemas de agendamento, integrações com API Helena/WTS |
-| `03_Documentacao/` | Documentação técnica, **Skills do Claude Code** (`Skills/agente-odontologico` — o guia v3 de construção de agentes), scrapers e plataforma |
-| `04_Automações/` | Scripts Python de automação de CRM (transferência de leads por etiqueta: agendou, faltou, compareceu, não agendou) |
-| `_Arquivado/` | Material legado mantido por referência |
+| `01_Clinicas/` | Entregas por clínica, organizadas em subpastas por **letra inicial** (A, B, C...). Cada clínica tem seus arquivos na raiz da própria pasta (briefing, prompts dos estágios E0–E12, banco de conhecimento em CSV, workflows n8n); quando existe uma versão anterior relevante, ela fica em `<Clinica>/Arquivado/` dentro da própria pasta da clínica. Ex: `01_Clinicas/O/OB Clinic`, `01_Clinicas/V/Vassoler` |
+| `02_Projetos/` | Projetos de código ativos: dashboards financeiros (React/Next.js + Clinicorp), sistemas de agendamento, integrações com API Helena/WTS |
+| `03_Documentacao/` | Documentação técnica e de referência: **Skills do Claude Code** (`03_Documentacao/Skills/agente-odontologico` — o guia v3 de construção de agentes; também `clickup-report` e `antigravity-n8n-skills`), `clinicorp-api-docs/` (documentação da API Clinicorp), `HELENA_FRAMEWORK.md` e `Onboarding_Standalone/` |
+| `04_Automações/` | Scripts de automação de CRM (transferência de leads por etiqueta: agendou, faltou, compareceu, não agendou) e workflows n8n de referência (`n8n_workflowbase.json`, `n8n_lead_novo_ibs_odontologia.json`, `IBS/`) |
+| `_Arquivado/` | Material legado mantido só por referência histórica (hoje: `Versao_Antiga_Aninhada/`, snapshot de clínicas antigas) |
 
 ---
 
@@ -63,7 +63,7 @@ A skill orienta o Claude a fazer as perguntas certas de onboarding e gerar todos
 1. Responda o checklist da Etapa 1 do `SKILL.md` com o briefing da clínica
 2. Gere os arquivos com o Claude Code (prefixo da clínica, ex: `OB_`, `VA_`)
 3. Cole os prompts dos estágios e descrições de habilidades no WTS (tipos de habilidade: ver tabela no SKILL.md)
-4. Se a clínica usa Clinicorp: duplique o workflow n8n de referência (`01_Clinicas/2026-04 - Abril/OB Clinic/n8n/`) e ajuste a configuração conforme `references/integracao-n8n.md`
+4. Se a clínica usa Clinicorp: duplique o workflow n8n de referência (`01_Clinicas/O/OB Clinic/n8n/`) e ajuste a configuração conforme `references/integracao-n8n.md`
 5. Teste as 5 ações de agendamento antes de ativar
 
 ### 4. Rodar os projetos (dashboards/agendamentos)

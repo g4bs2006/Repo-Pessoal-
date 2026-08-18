@@ -1,0 +1,639 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## ETIQUETA META\n**",
+        "height": 640,
+        "width": 3680
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        288,
+        208
+      ],
+      "typeVersion": 1,
+      "id": "2ba04173-fece-4ba9-9ef1-9ebd2812a6b4",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "IBS-ETIQUETAS-2",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        448,
+        432
+      ],
+      "id": "f579d992-be69-4e29-8bfd-71634d0bc5a3",
+      "name": "Etiqueta Meta",
+      "webhookId": "prime-wh-001"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Evento SESSION_NEW (lead novo): dados em body.content. Também aceita o formato antigo.\nconst b = $input.first().json.body ?? $input.first().json;\nconst c = b.content ?? b;\n\nconst companyId = c.companyId ?? b.companyId ?? null;\nconst contactId = c.contactId ?? c.contactDetails?.id ?? c.contact?.id ?? null;\nconst contactName = c.contactDetails?.name ?? c.contact?.name ?? 'Sem nome';\nconst sessionId = c.id ?? c.sessionId ?? c.session?.id ?? null;\nconst platform = (c.channelDetails?.platform ?? c.channel?.platform ?? c.channelType ?? '').toString().toUpperCase();\nconst utm = c.utm ?? c.session?.utm ?? null;\nconst utmSource = (utm && utm.source) ? String(utm.source).toUpperCase() : null;\n\n// Capturando Headline e Campaign\nconst headline = (utm && utm.headline) ? utm.headline : null;\nconst campaign = (utm && utm.campaign) ? utm.campaign : null;\n\nconst lastContactMessage = c.lastMessageText ?? c.lastContactMessage ?? c.lastMessagesAggregated?.text ?? '';\n\n// Deteccao da campanha especial 'Implantes Dentarios em Goiania': lastMessageText vem null no SESSION_NEW, entao a checagem usa apenas o headline do UTM\nconst headlineMatch = (headline || '').trim() === 'Implantes Dentários em Goiânia';\nconst tagEspecialId = headlineMatch ? 'df07b4fb-7d49-454d-99a7-e932f9441ac2' : null;\n\nconst origemRaw = (utmSource ?? platform ?? 'DESCONHECIDO');\nlet origem;\nif (origemRaw.includes('INSTAGRAM')) origem = 'INSTAGRAM';\nelse if (origemRaw.includes('FACEBOOK')) origem = 'FACEBOOK';\nelse origem = 'ORGANICO';\n\nconst agora = new Date();\nconst dataEntrada = agora.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });\nconst horaEntrada = agora.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });\n\n// Montando a descrição perfeitamente APENAS com Entrada e Headline\nlet descricao = `Entrada: ${dataEntrada} às ${horaEntrada}`;\nif (headline) descricao += `\\nHeadline: ${headline}`;\n\nreturn [{ json: { companyId, contactId, contactName, sessionId, platform, utmSource, origem, campaign, headline, lastContactMessage, tagEspecialId, dataEntrada, horaEntrada, descricao } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        432
+      ],
+      "id": "c2eccc92-9607-4626-8cee-d2d99e34b094",
+      "name": "Preparar Dados"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "automacao_clinicas",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "helena_company_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.companyId }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        976,
+        432
+      ],
+      "id": "5a7330c1-3d13-4f68-8800-682a4b5c6b24",
+      "name": "Buscar Config",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "soczryPqMcjcq9Zm",
+          "name": "PAINEIS, ANDRE CLIENTES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Junta a linha (config achatada da clínica) com os dados preparados.\n// .item.json garante que o n8n pegue os dados exatos DESSA execução e não misture os leads!\nconst prep = $('Preparar Dados').item.json;\nconst row = $input.first().json || {};\n\nconst ativoBool = (row.ativo === true || String(row.ativo).toLowerCase() === 'true');\nif (!row.helena_company_id || !ativoBool) {\n  return [{ json: { ...prep, found: false } }];\n}\n\nconst mapaPorOrigem = {\n  FACEBOOK:  { tag_nome: row.fb_tag_nome,  panel_tag_id: row.fb_panel_tag_id,  contact_tag_id: row.fb_contact_tag_id },\n  INSTAGRAM: { tag_nome: row.ig_tag_nome,  panel_tag_id: row.ig_panel_tag_id,  contact_tag_id: row.ig_contact_tag_id },\n  ORGANICO:  { tag_nome: row.org_tag_nome, panel_tag_id: row.org_panel_tag_id, contact_tag_id: row.org_contact_tag_id }\n};\nconst temOrigem = !!(mapaPorOrigem[prep.origem] && mapaPorOrigem[prep.origem].panel_tag_id);\nconst mapa = (temOrigem ? mapaPorOrigem[prep.origem] : mapaPorOrigem['ORGANICO']) || {};\n\nreturn [{ json: {\n  ...prep,\n  found: true,\n  clinica_nome: row.nome,\n  token: row.helena_token,\n  panel_id: row.panel_id,\n  step_id: row.step_id,\n  origem_aplicada: temOrigem ? prep.origem : 'ORGANICO',\n  tag_nome: mapa.tag_nome ?? null,\n  panel_tag_id: mapa.panel_tag_id ?? null,\n  contact_tag_id: mapa.contact_tag_id ?? null\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        432
+      ],
+      "id": "b985c03b-c52f-4f59-8e11-d01550912981",
+      "name": "Resolver Config"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-found",
+              "leftValue": "={{ $json.found }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        432
+      ],
+      "id": "3bc1c15a-f7a5-46a9-a2d5-80fc6cc6ff43",
+      "name": "Config Existe?"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.wts.chat/crm/v1/panel/card?PanelId={{ $('Resolver Config').first().json.panel_id }}&ContactId={{ $('Resolver Config').first().json.contactId }}&IncludeArchived=false&OrderBy=CreatedAt&OrderDirection=DESCENDING&PageSize=5",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1696,
+        320
+      ],
+      "id": "569c3e58-5732-4d1b-88ce-2a8191f3a97f",
+      "name": "Buscar Card Existente"
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nconst arr = Array.isArray(resp) ? resp : (resp.items ?? resp.data ?? resp.cards ?? []);\nconst hasCard = Array.isArray(arr) && arr.length > 0;\nconst cardId = hasCard ? (arr[0].id ?? arr[0].cardId ?? null) : null;\n// Capturando a descrição antiga para não perdermos o histórico!\nconst oldDesc = hasCard ? (arr[0].description ?? '') : '';\n\nreturn [{ json: { hasCard, cardId, oldDesc } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1984,
+        320
+      ],
+      "id": "1904f3cb-8631-4456-858f-cf9ddcc3d32a",
+      "name": "Tem Card?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-hascard",
+              "leftValue": "={{ $json.hasCard }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2288,
+        320
+      ],
+      "id": "b8578b6a-512b-4240-88e4-4b32662ac76d",
+      "name": "Card Existe?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.wts.chat/crm/v1/panel/card",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Resolver Config').first().json.token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"panelId\": \"{{ $('Resolver Config').first().json.panel_id }}\",\n  \"stepId\": \"{{ $('Resolver Config').first().json.step_id }}\",\n  \"title\": {{ JSON.stringify($('Resolver Config').first().json.contactName) }},\n  \"description\": {{ JSON.stringify($('Resolver Config').first().json.descricao) }},\n  \"contactIds\": [\"{{ $('Resolver Config').first().json.contactId }}\"],\n  \"tagIds\": [\"{{ $('Resolver Config').first().json.panel_tag_id }}\"],\n  \"customFields\": {\n    \"campanha\": \"{{ $('Resolver Config').first().json.headline || '' }}\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2624,
+        512
+      ],
+      "id": "c7c93eb1-d18e-485c-bba7-29d6a6ee3190",
+      "name": "Criar Card"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"ok\",\n  \"clinica\": \"{{ $('Resolver Config').first().json.clinica_nome }}\",\n  \"acao\": \"{{ $('Tem Card?').first().json.hasCard ? 'anotacao' : 'card_criado' }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        3808,
+        320
+      ],
+      "id": "5a770cfd-48f9-4a89-ae4a-ffaba477b542",
+      "name": "Responder OK"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"ignorado\",\n  \"motivo\": \"clinica nao cadastrada ou inativa\",\n  \"companyId\": \"{{ $('Preparar Dados').first().json.companyId }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1648,
+        528
+      ],
+      "id": "5271b563-1512-4b7c-9842-c3f794d3cc6e",
+      "name": "Responder Nao Configurado"
+    },
+    {
+      "parameters": {
+        "jsCode": "const config = $('Resolver Config').first().json;\nconst card = $('Tem Card?').first().json;\n\n// Montando o texto de forma limpa, sem usar \\n manual\nconst desc = `Nova Entrada: ${config.dataEntrada} às ${config.horaEntrada}\nOrigem: ${config.origem_aplicada}\nCampanha: ${config.campaign || \"Não identificada\"}\nHeadline: ${config.headline || \"Não identificada\"}\nMensagem: ${config.lastContactMessage || \"\"}\n\n--- Histórico Anterior ---\n${(card.oldDesc || \"\").replace(\"Entrada:\", \"Entrada Anterior:\")}`;\n\nreturn [{\n  json: {\n    // Mandamos com inicial maiúscula e minúscula para garantir que a API C# aceite!\n    title: config.contactName,\n    Title: config.contactName,\n    description: desc,\n    Description: desc,\n    panelId: config.panel_id,\n    stepId: config.step_id\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2528,
+        304
+      ],
+      "id": "c278d754-6322-48e4-b907-e8c6d078177e",
+      "name": "Montar Payload"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.wts.chat/crm/v1/panel/card/{{ $('Tem Card?').first().json.cardId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Resolver Config').first().json.token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ fields: [\"Title\", \"Description\"], title: $('Resolver Config').first().json.contactName, description: 'Nova Entrada: ' + $('Resolver Config').first().json.dataEntrada + ' às ' + $('Resolver Config').first().json.horaEntrada + '\\nOrigem: ' + $('Resolver Config').first().json.origem_aplicada + '\\nCampanha: ' + ($('Resolver Config').first().json.campaign || 'Não identificada') + '\\nHeadline: ' + ($('Resolver Config').first().json.headline || 'Não identificada') + '\\nMensagem: ' + ($('Resolver Config').first().json.lastContactMessage || '') + '\\n\\n--- Histórico Anterior ---\\n' + ($('Tem Card?').first().json.oldDesc || '').replace('Entrada:', 'Entrada Anterior:') }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2768,
+        304
+      ],
+      "name": "Atualizar Descricao do Card1",
+      "id": "b9f98b19-3c5e-4b8b-93e6-a352497831b1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-tagespecial",
+              "leftValue": "={{ $('Resolver Config').first().json.tagEspecialId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3088,
+        304
+      ],
+      "id": "6706fde6-2bc9-438d-9b8c-b02cf2f34f52",
+      "name": "Tem Tag Especial?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.wts.chat/core/v1/contact/{{ $('Resolver Config').first().json.contactId }}/tags",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Resolver Config').first().json.token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tagIds: [$('Resolver Config').first().json.tagEspecialId], operation: 'InsertIfNotExists' }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3456,
+        224
+      ],
+      "id": "350ba949-3164-42e2-a1be-d4b6387bb8c0",
+      "name": "Aplicar Tag Especial no Contato"
+    }
+  ],
+  "connections": {
+    "Etiqueta Meta": {
+      "main": [
+        [
+          {
+            "node": "Preparar Dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Dados": {
+      "main": [
+        [
+          {
+            "node": "Buscar Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Config": {
+      "main": [
+        [
+          {
+            "node": "Resolver Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolver Config": {
+      "main": [
+        [
+          {
+            "node": "Config Existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config Existe?": {
+      "main": [
+        [
+          {
+            "node": "Buscar Card Existente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder Nao Configurado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Card Existente": {
+      "main": [
+        [
+          {
+            "node": "Tem Card?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem Card?": {
+      "main": [
+        [
+          {
+            "node": "Card Existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Card Existe?": {
+      "main": [
+        [
+          {
+            "node": "Montar Payload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Criar Card",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar Card": {
+      "main": [
+        [
+          {
+            "node": "Tem Tag Especial?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar Payload": {
+      "main": [
+        [
+          {
+            "node": "Atualizar Descricao do Card1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualizar Descricao do Card1": {
+      "main": [
+        [
+          {
+            "node": "Tem Tag Especial?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem Tag Especial?": {
+      "main": [
+        [
+          {
+            "node": "Aplicar Tag Especial no Contato",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aplicar Tag Especial no Contato": {
+      "main": [
+        [
+          {
+            "node": "Responder OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "Etiqueta Meta": [
+      {
+        "headers": {
+          "host": "webhook.dentistapower.com.br",
+          "content-length": "3358",
+          "content-type": "application/json; charset=utf-8",
+          "x-forwarded-for": "18.215.79.89",
+          "x-forwarded-host": "webhook.dentistapower.com.br",
+          "x-forwarded-port": "443",
+          "x-forwarded-proto": "https",
+          "x-forwarded-server": "7b7aec13661d",
+          "x-real-ip": "18.215.79.89",
+          "accept-encoding": "gzip"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "eventType": "SESSION_NEW",
+          "date": "2026-08-03T11:58:50.23861Z",
+          "content": {
+            "id": "dfd1c944-3b28-4247-9939-8f76d319ee02",
+            "createdAt": "2026-08-03T11:58:49.8708952Z",
+            "updatedAt": "2026-08-03T11:58:50.2009783Z",
+            "active": true,
+            "number": "2026080300041",
+            "startAt": "2026-08-03T11:58:49.8708953Z",
+            "endAt": null,
+            "firstUserInteractionAt": null,
+            "firstAgentMessageAt": null,
+            "status": "PENDING",
+            "contactId": "c2535a86-c50b-4364-bdec-595b9962bac0",
+            "contactDetails": {
+              "id": "c2535a86-c50b-4364-bdec-595b9962bac0",
+              "name": "Maria de Lourdes Sena",
+              "email": null,
+              "pictureUrl": null,
+              "phonenumber": "+55|62984849183",
+              "instagram": null,
+              "phonenumberFormatted": "(62) 98484-9183",
+              "tagsId": [],
+              "status": "ACTIVE",
+              "tagsName": []
+            },
+            "channelId": "7376259a-5567-4211-b5a6-d360ae42ec7c",
+            "channelType": "CLOUDAPI_WHATSAPP",
+            "channelDetails": {
+              "id": "(62) 99332-0383",
+              "platform": "WhatsApp",
+              "provider": "Meta",
+              "providerVariable": null,
+              "pictureUrl": "https://cdn.flw.chat/static/whatsapp-mini.png",
+              "displayName": null
+            },
+            "companyId": "58e1700e-84e1-4d41-aaa9-2918925a3cef",
+            "departmentId": "0713dd49-7b5c-4b11-b612-6c55d9184155",
+            "departmentDetails": {
+              "id": "0713dd49-7b5c-4b11-b612-6c55d9184155",
+              "companyId": "58e1700e-84e1-4d41-aaa9-2918925a3cef",
+              "name": "Geral",
+              "description": null
+            },
+            "userId": null,
+            "botId": "6468fdce-9178-4988-b20f-adbda9520ad3",
+            "botVersionId": "36b33aff-220e-4a22-8f55-899f7e678bf3",
+            "agentDetails": null,
+            "previousSessionId": null,
+            "readTimestamp": null,
+            "waitReply": false,
+            "expired": false,
+            "windowStatus": "ACTIVE",
+            "lastInteractionDate": "2026-08-03T11:58:49.8708952Z",
+            "lastMessageOut": null,
+            "lastMessageIn": "2026-08-03T11:58:49.326Z",
+            "lastMessageText": null,
+            "unreadCount": 0,
+            "previewUrl": "https://app.fluxodonto.com/redirect?type=SESSION&id=dfd1c944-3b28-4247-9939-8f76d319ee02",
+            "utm": {
+              "clid": "Afhod5hrxzs0aO3KxOXBYvm7w_QEfb6oNaBVn_jqnpIJMSk3ZvNBXRJIz-iztZNJyEsDr0kIYJx2xlzTKS2ErRvIPNpHFIja0xEGNPZ30xXBtAsoCGRJSANFTEc2e_zdn9bzrg",
+              "source": "FACEBOOK",
+              "medium": "WHATSAPP API",
+              "campaign": "52549103685609",
+              "content": "🚨 GOIÂNIA: Dentadura machucando ou prótese frouxa? Você não precisa aceitar isso como \"normal\".\n\nSe você usa dentadura ou daquelas próteses móveis com grampo, sabe o quanto é frustrante: comida entrando por baixo, céu da boca coberto de resina que tira todo o gosto do alimento, e aquela insegurança constante de sorrir.\n\nMas existe uma solução definitiva.\n\nNo vídeo, eu te mostro a diferença da Prótese Protocolo. Ela é fixa, parafusada sobre apenas 4 implantes e super fina! Como ela não cobre o céu da boca, você volta a sentir o sabor de tudo que ama comer. É como se você tivesse seus dentes fixos de volta, com total firmeza e estética impecável.\n\nChega de improvisos. Você merece o prazer de mastigar com segurança.\n\n👉 Toque no botão e agende um diagnóstico detalhado. Vamos decidir juntos o melhor caminho para o seu sorriso de volta.\n\n📍 Goiânia\nDra Ila Flavia Furbino, Cirurgiã Dentista Clínico Geral CROGO 11544.",
+              "headline": "Implantes Dentários em Goiânia",
+              "term": null,
+              "referralUrl": "https://fb.me/5zR8WpvEy",
+              "sourceId": "52549103685609"
+            },
+            "classification": null,
+            "metadata": null
+          },
+          "changeMetadata": {
+            "source": "SYSTEM",
+            "userId": "00000000-0000-0000-0000-000000000000",
+            "changes": null
+          }
+        },
+        "webhookUrl": "https://webhook.dentistapower.com.br/webhook/lead-novo-ibs-odontologia",
+        "executionMode": "production"
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d1a2ea4f12ae9ebd3132590ec74e61784d3b49e17967bcb70d511f83551a7c49"
+  }
+}

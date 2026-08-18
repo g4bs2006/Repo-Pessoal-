@@ -15,8 +15,9 @@ description: >
   integração com n8n e agenda Clinicorp, caminhos A/B/C, campanhas com trigger
   na primeira mensagem, regras especiais como atendimento infantil, múltiplos
   dentistas com dias restritos, avaliação com voucher/cortesia solidária,
-  filtros de agendamento, correção de problemas em produção e duplicação de
-  agente com nome diferente.
+  filtros de agendamento, correção de problemas em produção, duplicação de
+  agente com nome diferente, e o subsistema de CRM que move card no Kanban da
+  Helena e etiqueta o contato ao agendar/remarcar/cancelar.
 ---
 
 # Agente de Atendimento Odontológico — Guia Completo v3
@@ -29,6 +30,7 @@ Leia os arquivos em `references/` conforme necessário:
 - `references/memoria.md` — memória de longo prazo: Ler_Contexto, Salvar_Contexto com campos semânticos, Registrar_Origem, caminhos A/B/C
 - `references/diferenciais.md` — variações por clínica: campanhas, cortesia solidária, persona, dois dentistas, infantil, duas unidades
 - `references/integracao-n8n.md` — workflow n8n de agendamento com Clinicorp (webhook, ações, endpoints, parsing)
+- `references/integracao-crm-cards.md` — subsistema n8n que espelha agendamento/remarcação/cancelamento no CRM da Helena (mover card + etiquetar contato); como portar entre clínicas
 - `references/correcoes.md` — correções de problemas comuns em produção
 
 ---
@@ -93,6 +95,8 @@ Os estágios foram reorganizados: Problema e Implicação se fundiram, e Verific
 ### Etapa 4 — Integração n8n (se Clinicorp)
 
 Configurar workflow de agendamento com webhook + roteamento por `acao_fluxo`. Ver `references/integracao-n8n.md`.
+
+Se a clínica também tiver painel de CRM na Helena e quiser que agendamento/remarcação/cancelamento movam o card e etiquetem o contato, portar o subsistema descrito em `references/integracao-crm-cards.md` (fan-out a partir dos nós que confirmam a operação na Clinicorp).
 
 ### Etapa 5 — Duplicação (quando há dois agentes)
 

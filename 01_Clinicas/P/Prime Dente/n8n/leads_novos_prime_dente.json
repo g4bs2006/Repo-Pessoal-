@@ -1,0 +1,502 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-novo-prime-dente",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1616,
+        96
+      ],
+      "id": "4fb243f9-2b19-43b2-80be-e6f3a2c74186",
+      "name": "Webhook Lead",
+      "webhookId": "lead-etiqueta-generico"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Evento SESSION_NEW (lead novo): dados em body.content. Também aceita o formato antigo.\nconst b = $input.first().json.body ?? $input.first().json;\nconst c = b.content ?? b;\n\nconst companyId = c.companyId ?? b.companyId ?? null;\nconst contactId = c.contactId ?? c.contactDetails?.id ?? c.contact?.id ?? null;\nconst contactName = c.contactDetails?.name ?? c.contact?.name ?? 'Sem nome';\nconst sessionId = c.id ?? c.sessionId ?? c.session?.id ?? null;\nconst platform = (c.channelDetails?.platform ?? c.channel?.platform ?? c.channelType ?? '').toString().toUpperCase();\n\n// Diferencia a unidade (Méier x Botafogo) pelo número que recebeu a conversa.\nconst channelNumberLimpo = (c.channelDetails?.id ?? c.channel?.id ?? '').toString().replace(/\\D/g, '');\nconst MAPA_UNIDADES_PRIME_DENTE = {\n  '5521999918021': { unidade: 'botafogo', tagId: 'e39e1fb6-ad38-4ae4-9973-69398562dd80' },\n  '21999918021':   { unidade: 'botafogo', tagId: 'e39e1fb6-ad38-4ae4-9973-69398562dd80' },\n  '5521999911375': { unidade: 'meier',    tagId: '1bfab6c5-85d2-43d9-a136-a7978f7c15a8' },\n  '21999911375':   { unidade: 'meier',    tagId: '1bfab6c5-85d2-43d9-a136-a7978f7c15a8' }\n};\nconst unidadeInfo = MAPA_UNIDADES_PRIME_DENTE[channelNumberLimpo] || null;\nconst unidade = unidadeInfo ? unidadeInfo.unidade : null;\nconst unidadeTagId = unidadeInfo ? unidadeInfo.tagId : null;\n\nconst utm = c.utm ?? c.session?.utm ?? null;\nconst utmSource = (utm && utm.source) ? String(utm.source).toUpperCase() : null;\nconst headline = (utm && utm.headline) ? utm.headline : null;\n// Na Helena, utm.campaign = ID numérico do anúncio Meta (igual a sourceId), não o nome da campanha.\n// O legível é o headline (título do anúncio), que se repete entre anúncios — por isso gravamos 'headline (adId)'.\nconst adId = utm ? (utm.sourceId ?? utm.campaign ?? null) : null;\nconst campanha = utm ? ([headline, adId ? '(' + adId + ')' : null].filter(Boolean).join(' ') || null) : null;\nconst lastContactMessage = c.lastMessageText ?? c.lastContactMessage ?? c.lastMessagesAggregated?.text ?? '';\n\nconst origemRaw = (utmSource ?? platform ?? 'DESCONHECIDO');\nlet origem;\nif (origemRaw.includes('INSTAGRAM')) origem = 'INSTAGRAM';\nelse if (origemRaw.includes('FACEBOOK')) origem = 'FACEBOOK';\nelse origem = 'ORGANICO';\n\nconst trafegoPago = origem === 'FACEBOOK' || origem === 'INSTAGRAM';\n\nconst agora = new Date();\nconst dataEntrada = agora.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });\nconst horaEntrada = agora.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });\n\nlet descricao = `Entrada: ${dataEntrada} às ${horaEntrada}`;\nif (campanha) descricao += `\\nCampanha: ${campanha}`;\n\nreturn [{ json: { companyId, contactId, contactName, sessionId, platform, unidade, unidadeTagId, utmSource, origem, headline, adId, campanha, trafegoPago, lastContactMessage, dataEntrada, horaEntrada, descricao } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1392,
+        96
+      ],
+      "id": "8c4fa2d2-220d-4dbb-8ea3-e6688b2de7ea",
+      "name": "Preparar Dados"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "automacao_clinicas",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "helena_company_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.companyId }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1168,
+        96
+      ],
+      "id": "5d0f0c4b-bd03-49df-ac28-9dcfb364b5e4",
+      "name": "Buscar Config",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "soczryPqMcjcq9Zm",
+          "name": "PAINEIS, ANDRE CLIENTES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Junta a linha (config achatada da clínica) com os dados preparados.\n// 'alwaysOutputData' no node Supabase garante 1 item mesmo sem match.\nconst prep = $('Preparar Dados').first().json;\nconst row = $input.first().json || {};\n\nconst ativoBool = (row.ativo === true || String(row.ativo).toLowerCase() === 'true');\nif (!row.helena_company_id || !ativoBool) {\n  return [{ json: { ...prep, found: false } }];\n}\n\nconst mapaPorOrigem = {\n  FACEBOOK:  { tag_nome: row.fb_tag_nome,  panel_tag_id: row.fb_panel_tag_id,  contact_tag_id: row.fb_contact_tag_id },\n  INSTAGRAM: { tag_nome: row.ig_tag_nome,  panel_tag_id: row.ig_panel_tag_id,  contact_tag_id: row.ig_contact_tag_id },\n  ORGANICO:  { tag_nome: row.org_tag_nome, panel_tag_id: row.org_panel_tag_id, contact_tag_id: row.org_contact_tag_id }\n};\nconst temOrigem = !!(mapaPorOrigem[prep.origem] && mapaPorOrigem[prep.origem].panel_tag_id);\nconst mapa = (temOrigem ? mapaPorOrigem[prep.origem] : mapaPorOrigem['ORGANICO']) || {};\n\n// Valida GUID: só conta como etiqueta válida se for um UUID de verdade (evita 500 'System.Guid').\nconst guidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst contact_tag_id = guidRe.test(String(mapa.contact_tag_id || '')) ? mapa.contact_tag_id : null;\nconst panel_tag_id   = guidRe.test(String(mapa.panel_tag_id   || '')) ? mapa.panel_tag_id   : null;\n\nreturn [{ json: {\n  ...prep,\n  found: true,\n  clinica_nome: row.nome,\n  token: row.helena_token,\n  panel_id: row.panel_id,\n  step_id: row.step_id,\n  origem_aplicada: temOrigem ? prep.origem : 'ORGANICO',\n  tag_nome: mapa.tag_nome ?? null,\n  panel_tag_id,\n  contact_tag_id,\n  tem_contact_tag: !!contact_tag_id,\n  tem_panel_tag: !!panel_tag_id,\n  campanha_field_key: row.campanha_field_key ?? 'campanha'\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -944,
+        96
+      ],
+      "id": "eba26f75-c983-4433-bf05-11a0c29c0839",
+      "name": "Resolver Config"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-found",
+              "leftValue": "={{ $json.found }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        96
+      ],
+      "id": "755b2cc1-6f37-4d01-80c2-e772aa74a712",
+      "name": "Config Existe?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-hastag",
+              "leftValue": "={{ $('Resolver Config').first().json.tem_contact_tag }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -496,
+        0
+      ],
+      "id": "1983f9e1-9c55-4e54-8478-c8da14fe67b0",
+      "name": "Tem etiqueta contato?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.wts.chat/core/v1/contact/{{ $('Resolver Config').first().json.contactId }}/tags",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Resolver Config').first().json.token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"tagIds\": [\"{{ $('Resolver Config').first().json.contact_tag_id }}\"],\n  \"operation\": \"InsertIfNotExists\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -272,
+        -96
+      ],
+      "id": "d7b9ced6-b8db-4887-863f-01b44eb86fec",
+      "name": "Etiqueta Contato",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.wts.chat/crm/v1/panel/card?PanelId={{ $('Resolver Config').first().json.panel_id }}&ContactId={{ $('Resolver Config').first().json.contactId }}&IncludeArchived=false&OrderBy=CreatedAt&OrderDirection=DESCENDING&PageSize=5",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Resolver Config').first().json.token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -32,
+        16
+      ],
+      "id": "e20520e7-931f-455f-8cdf-1acf09fd41ac",
+      "name": "Buscar Card Existente",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nconst arr = Array.isArray(resp) ? resp : (resp.items ?? resp.data ?? resp.cards ?? []);\nconst hasCard = Array.isArray(arr) && arr.length > 0;\nconst cardId = hasCard ? (arr[0].id ?? arr[0].cardId ?? null) : null;\nreturn [{ json: { hasCard, cardId } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        16
+      ],
+      "id": "14ce3e01-4b1e-4797-b2b0-04e069301aed",
+      "name": "Tem Card?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-hascard",
+              "leftValue": "={{ $json.hasCard }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        400,
+        16
+      ],
+      "id": "94b3ddfd-0e81-4840-aefd-c1abef9b9a72",
+      "name": "Card Existe?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.wts.chat/crm/v1/panel/card/{{ $('Tem Card?').first().json.cardId }}/note",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Resolver Config').first().json.token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": {{ JSON.stringify('Lead voltou a interagir em ' + $('Resolver Config').first().json.dataEntrada + ' às ' + $('Resolver Config').first().json.horaEntrada + '\\nOrigem: ' + $('Resolver Config').first().json.origem_aplicada + '\\nMensagem: ' + ($('Resolver Config').first().json.lastContactMessage || '')) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        624,
+        -80
+      ],
+      "id": "e273ef1e-77de-44c2-b5ab-ffa86ea192b6",
+      "name": "Adicionar Anotacao",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.wts.chat/crm/v1/panel/card",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Resolver Config').first().json.token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"panelId\": \"{{ $('Resolver Config').first().json.panel_id }}\",\n  \"stepId\": \"{{ $('Resolver Config').first().json.step_id }}\",\n  \"title\": {{ JSON.stringify($('Resolver Config').first().json.contactName) }},\n  \"description\": {{ JSON.stringify($('Resolver Config').first().json.descricao) }},\n  \"contactIds\": [\"{{ $('Resolver Config').first().json.contactId }}\"],\n  \"tagIds\": {{ JSON.stringify([$('Resolver Config').first().json.panel_tag_id, $('Resolver Config').first().json.unidadeTagId].filter(Boolean)) }},\n  \"customFields\": {{ JSON.stringify(($('Resolver Config').first().json.trafegoPago && $('Resolver Config').first().json.campanha && $('Resolver Config').first().json.campanha_field_key) ? { [$('Resolver Config').first().json.campanha_field_key]: $('Resolver Config').first().json.campanha } : {}) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        624,
+        112
+      ],
+      "id": "bfd6156b-ac9d-4553-9e83-9d54f63450c4",
+      "name": "Criar Card",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"ok\",\n  \"clinica\": \"{{ $('Resolver Config').first().json.clinica_nome }}\",\n  \"acao\": \"{{ $('Tem Card?').first().json.hasCard ? 'anotacao' : 'card_criado' }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        848,
+        16
+      ],
+      "id": "7669c988-8a9b-48e4-a479-0a62ec5289ab",
+      "name": "Responder OK"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"ignorado\",\n  \"motivo\": \"clinica nao cadastrada ou inativa\",\n  \"companyId\": \"{{ $('Preparar Dados').first().json.companyId }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -496,
+        192
+      ],
+      "id": "6072f0ff-551e-4e3a-9c43-4dc6c043bda0",
+      "name": "Responder Nao Configurado"
+    }
+  ],
+  "connections": {
+    "Webhook Lead": {
+      "main": [
+        [
+          {
+            "node": "Preparar Dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Dados": {
+      "main": [
+        [
+          {
+            "node": "Buscar Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Config": {
+      "main": [
+        [
+          {
+            "node": "Resolver Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolver Config": {
+      "main": [
+        [
+          {
+            "node": "Config Existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config Existe?": {
+      "main": [
+        [
+          {
+            "node": "Tem etiqueta contato?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder Nao Configurado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem etiqueta contato?": {
+      "main": [
+        [
+          {
+            "node": "Etiqueta Contato",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar Card Existente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Etiqueta Contato": {
+      "main": [
+        [
+          {
+            "node": "Buscar Card Existente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Card Existente": {
+      "main": [
+        [
+          {
+            "node": "Tem Card?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem Card?": {
+      "main": [
+        [
+          {
+            "node": "Card Existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Card Existe?": {
+      "main": [
+        [
+          {
+            "node": "Adicionar Anotacao",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Criar Card",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adicionar Anotacao": {
+      "main": [
+        [
+          {
+            "node": "Responder OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar Card": {
+      "main": [
+        [
+          {
+            "node": "Responder OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "d1a2ea4f12ae9ebd3132590ec74e61784d3b49e17967bcb70d511f83551a7c49"
+  }
+}
