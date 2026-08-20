@@ -28,7 +28,7 @@ Se a data cai em sábado ou domingo, mesma coisa: a Scopel atende de segunda a s
 
 ### 4. Acionar `verificar_disponibilidade`
 
-Em seguida, apresentar **no máximo 2 opções**. As opções mais a pergunta de escolha são **um bloco só** e não contam no limite de balões do turno.
+Em seguida, apresentar **no máximo 2 opções**. As opções mais a pergunta de escolha são **um bloco só** (ver as exceções de `SCO_formatacao_mensagens.md`).
 
 | Retorno | Como apresentar (referência de tom) |
 |---|---|

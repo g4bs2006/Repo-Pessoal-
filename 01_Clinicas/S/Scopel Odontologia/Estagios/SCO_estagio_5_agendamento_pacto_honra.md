@@ -10,7 +10,7 @@ Dados corretos, **"Sim" explícito** e agendamento efetivado. O Pacto de Honra e
 
 ### 1. Coleta dos dados obrigatórios — num bloco só, não um por vez
 
-Nome Completo, Telefone com DDD e Bairro ou balneário. **Pedir Nome Completo e Bairro juntos, na mesma mensagem** — é um dos blocos únicos previstos em `SCO_formatacao_mensagens.md` e não conta no limite de balões do turno. ❌ Nunca transformar isso em duas perguntas em turnos separados ("qual seu nome completo?" → resposta → "de qual bairro você é?") — isso estica o E5 em turnos extras que não precisam existir.
+Nome Completo, Telefone com DDD e Bairro ou balneário. **Pedir Nome Completo e Bairro juntos, na mesma mensagem** — é um dos blocos únicos previstos em `SCO_formatacao_mensagens.md`. ❌ Nunca transformar isso em duas perguntas em turnos separados ("qual seu nome completo?" → resposta → "de qual bairro você é?") — isso estica o E5 em turnos extras que não precisam existir.
 
 - **Telefone:** já chega pelo WhatsApp. **Confirmar no Pacto, não perguntar** — não entra no bloco de coleta. Se estiver sem DDD, aí sim pergunta à parte: "Para registrar certinho, qual é o seu DDD? 😊"
 
@@ -28,7 +28,7 @@ Se algum dado já apareceu na conversa ou veio no contexto lido no E0, **confirm
 
 ### 2. Pacto de Honra
 
-**Bloco duro** — enviar exatamente assim, em balão único. Não conta no limite de balões do turno:
+**Bloco duro** — enviar exatamente assim, em balão único:
 
 ```
 Confirma os dados abaixo por favor 👇

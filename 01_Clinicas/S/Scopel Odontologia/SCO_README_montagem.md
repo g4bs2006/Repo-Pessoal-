@@ -118,21 +118,35 @@ O `SCO_BK_feriados.csv` tem os nacionais de 2026, o estadual do Paraná e os pri
 
 ## Checklist de conformidade v4 (rodar antes de ativar)
 
+Cole o bloco inteiro num terminal, de dentro da pasta da clínica. Ele imprime **OK** ou **FALHOU** por item — sem saída para interpretar à mão:
+
 ```bash
-# 1. Nenhuma habilidade removida sobrou nos arquivos operacionais
-grep -rniE 'tag_|Registrar_Origem|Confirmar_Compromisso_Honra|Cliente Agendou|Marcar_Dor|Classificar_Urgencia|Ler_Etiqueta' Configuracao/ Estagios/
+fail=0
+chk(){ if [ "$2" -eq 0 ]; then echo "OK    $1"; else echo "FALHOU $1 ($2)"; fail=1; fi; }
 
-# 2. Ler_Contexto só em E0, E7, E11 (definição) e E12
-grep -rln 'Ler_Contexto' Estagios/
+# 1. habilidade removida citada fora da tabela documental de habilidades
+chk "sem habilidades removidas" $(grep -rniE 'tag_|Registrar_Origem|Confirmar_Compromisso_Honra|Cliente Agendou|Marcar_Dor|Classificar_Urgencia|Ler_Etiqueta' Configuracao/ Estagios/ | grep -vc 'habilidades_estrutura')
 
-# 3. Salvar_Contexto só nos 6 eventos + transbordo
-grep -rc 'Salvar_Contexto' Estagios/*.md
+# 2. Ler_Contexto fora de E0/E7/E11/E12
+chk "Ler_Contexto restrito" $(grep -rl 'Ler_Contexto' Estagios/ | grep -vcE 'estagio_(0|7|11|12)_')
 
-# 4. Regra global vazando para dentro dos estágios
-grep -rniE '120 caracteres|travessão|máximo 2 emojis' Estagios/
+# 3. regra global vazando para dentro dos estágios
+chk "sem regra global nos estagios" $(grep -rniE '120 caracteres|travessão|máximo 2 emojis|limite de balões' Estagios/ | wc -l)
+
+# 4. notação [CAMPO] abolida (a nota é texto corrido)
+chk "sem notacao [CAMPO]" $(grep -rn '\[ALERTA\|\[DOR:\|\[URGÊNCIA\|\[PRÓXIMA_AÇÃO\|\[ÚLTIMA_MENSAGEM\|\[ORIGEM\]' Configuracao/ Estagios/ | wc -l)
+
+# 5. sequência de transbordo declarada só em constraints §9
+chk "transbordo nao duplicado" $(grep -rn 'frase de transbordo → `transferir_atendimento`' Estagios/ | wc -l)
+
+# 6. orçamento de prompt
+chars=$(cat Configuracao/*.md Estagios/*.md | wc -c)
+echo "      prompt: $chars chars"
+
+[ $fail -eq 0 ] && echo "--> PRONTO PARA ATIVAR" || echo "--> CORRIGIR ANTES DE ATIVAR"
 ```
 
-**Estado em 19/08/2026:** os quatro passam. O único retorno do item 1 é a tabela documental "O que a Clarisse NÃO aciona" em `SCO_habilidades_estrutura.md`, que existe justamente para registrar as remoções.
+**Estado em 20/08/2026:** os 5 checks passam. O item 1 exclui `SCO_habilidades_estrutura.md` de propósito — a tabela "O que a Clarisse NÃO aciona" cita as habilidades removidas justamente para registrá-las, e era isso que fazia o checklist antigo nunca dar limpo.
 
 ### Testes de ponta a ponta
 

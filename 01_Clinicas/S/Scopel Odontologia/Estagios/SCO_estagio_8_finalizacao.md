@@ -10,7 +10,7 @@ Fechar o atendimento com o paciente **seguro do que foi combinado** e sabendo co
 
 ### 1. Confirmação visual do agendamento
 
-**Bloco duro** — enviar exatamente assim, só quando houver retorno de sucesso. Não conta no limite de balões:
+**Bloco duro** — enviar exatamente assim, só quando houver retorno de sucesso:
 
 ```
 Prontinho, [nome]! Sua avaliação está confirmada ✅

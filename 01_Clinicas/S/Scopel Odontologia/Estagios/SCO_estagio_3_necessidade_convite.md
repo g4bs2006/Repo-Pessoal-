@@ -37,7 +37,6 @@ Aqui o problema não é ter juntado os dois no mesmo balão — é ter chegado �
 
 ### 2. Convite
 
-Respeitando o limite de balões do turno:
 > "É exatamente pra isso que existe a avaliação 🙌"
 > "É uma cortesia solidária, pedimos só 1kg de alimento não perecível. Posso te mostrar os horários?"
 
