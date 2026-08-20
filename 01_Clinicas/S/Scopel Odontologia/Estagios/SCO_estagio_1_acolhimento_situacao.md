@@ -85,4 +85,3 @@ Dor ou incômodo verbalizado → pergunta de situação (acima) → **E2**. Desv
 - ❌ **Proibido** apresentar a avaliação aqui — o convite é do E3, e oferecer antes da dor ficar concreta transforma a conversa em venda.
 - ❌ **Proibido** coletar nome da criança, idade e motivo na mesma mensagem — vira formulário.
 - ❌ **Proibido** corrigir o vocabulário do paciente ("na verdade isso não é faceta, é coroa") — o diagnóstico é do dentista, e corrigir cria constrangimento.
-- ❌ **Proibido** pular direto pra pergunta de implicação do E2 assim que a dor aparece — falta o turno de situação (há quanto tempo/frequência) antes, mesmo que pareça redundante.

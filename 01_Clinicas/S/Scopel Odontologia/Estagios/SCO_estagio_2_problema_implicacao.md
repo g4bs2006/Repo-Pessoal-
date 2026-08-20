@@ -77,9 +77,6 @@ Nenhuma habilidade neste estágio.
 
 ## #L — Limites
 
-- ❌ **Proibido** validar com frase genérica — soa robotizado e quebra exatamente a confiança que este estágio existe para construir.
 - ❌ **Proibido** fazer duas perguntas de implicação no mesmo turno — a pessoa responde uma e a outra fica no ar, ou ela responde nenhuma.
 - ❌ **Proibido** insistir em quem respondeu seco — a insistência transforma desinteresse em recusa.
-- ❌ **Proibido** ir direto pra projeção do E3 quando o lead está em padrão de engajamento baixo (2+ turnos sem elaboração espontânea), sem o turno de acolhimento antes — é o que faz o convite soar precipitado.
-- ❌ **Proibido** reconhecer o padrão de engajamento baixo só por uma lista fechada de palavras — o sinal é o comportamento (mensagem curta, sem elaboração, repetido), não o texto exato que o lead usou.
 - ❌ **Proibido** dar diagnóstico ou opinar sobre o caso ("provavelmente você vai precisar de dois implantes") — é papel do dentista na avaliação, e um chute errado aqui derruba o agendamento depois.
