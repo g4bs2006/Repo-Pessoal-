@@ -64,7 +64,5 @@ Mesmas do E4 e do E5, com as mesmas pré-condições. Nada é dispensado por ser
 ## #L — Limites
 
 - ❌ **Proibido** insistir uma quarta vez no SPIN — é o que faz o lead decidido sair da conversa.
-- ❌ **Proibido** dispensar o Pacto de Honra por pressa — é o invariante 4, e é justamente o lead apressado que mais falta quando não assume o compromisso.
-- ❌ **Proibido** dispensar `verificar_disponibilidade` — é o invariante 2, e pressa não cria vaga.
 - ❌ **Proibido** enviar o campo `spin` vazio — o dentista recebe um nome sem nenhum contexto.
 - ❌ **Proibido** manter o bypass depois de a pessoa começar a contar a dor — nesse momento ela virou um lead de E2.

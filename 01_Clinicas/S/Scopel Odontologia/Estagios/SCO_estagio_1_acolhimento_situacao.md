@@ -56,12 +56,9 @@ Se a mensagem mencionar filho, filha, neto ou criança:
 - Confirmar a idade cedo: a partir de 4 anos a Scopel atende em clínico geral. **Abaixo de 4 anos** → transbordo (constraints §9), com o alerta "lead abaixo da idade mínima".
 - ❌ Nunca prometer odontopediatra. A clínica não tem.
 
-### Encaminhamentos
+### Saída
 
-- Dor ou incômodo verbalizado → pergunta de situação (acima) → **E2**
-- Hesitação, dúvida ou objeção → **E9**
-- Pedido direto de horário → **E10**
-- Pergunta sobre consulta que já existe → **E7**
+Dor ou incômodo verbalizado → pergunta de situação (acima) → **E2**. Desvios por intenção do paciente: regra de trânsito do E0.
 
 ---
 

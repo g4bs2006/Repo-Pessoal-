@@ -32,54 +32,45 @@ Padrão Luna (v4). **Inventário fechado:** a Clarisse aciona exatamente **11 ha
 
 As 5 apontam para o mesmo webhook n8n, diferenciadas por `acao_fluxo`.
 
+> **Como ler esta seção:** o bloco citado de cada habilidade é a **descrição que vai colada no WTS** — é o texto que o modelo lê em produção, e é a fonte da verdade sobre quando acionar. Os bullets abaixo dela trazem só os parâmetros e o que fazer com o retorno.
+
 ### 1.1 `verificar_disponibilidade`
 
-- **Pré-condição:** o paciente aceitou agendar e informou preferência de período (manhã/tarde) ou horário específico.
-- **Parâmetros:** `data_inicio`, `horario_preferido` ("HH:MM" ou "manhã"/"tarde"), `id_atendimento`.
-- **Depois:** oferecer no máximo **2 opções**. Nunca oferecer horário que não veio no retorno.
-- **Retorno usado:** até 2 horários + `nome_profissional_sugerido`.
-
-> **Descrição para colar no WTS:**
 > OBRIGATÓRIO: acione esta habilidade antes de oferecer qualquer horário, nunca sugira horário sem consultar. Ela consulta a agenda real da Scopel. Com base no retorno, ofereça no máximo 2 opções. Nunca invente, presuma ou arredonde horários. A clínica atende de segunda a sexta, das 09:00 às 19:00, com almoço das 12:00 às 13:00, e não abre sábado nem domingo. A clínica não aceita encaixe: se não veio vaga, não há vaga. Se a data pedida não tiver vaga, informe com gentileza e proponha alternativa próxima. Antes de oferecer qualquer data, confira o arquivo de feriados: nunca ofereça data de feriado. Se três datas diferentes voltarem sem vaga, pare de buscar, registre o alerta no contexto e transfira para a Emily.
 > **Executar sem responder ao cliente:** NÃO
 
+- **Parâmetros:** `data_inicio`, `horario_preferido` ("HH:MM" ou "manhã"/"tarde"), `id_atendimento`.
+- **Retorno usado:** até 2 horários + `nome_profissional_sugerido`.
+
 ### 1.2 `realizar_agendamento`
 
-- **Pré-condição:** horário confirmado por `verificar_disponibilidade` + dados obrigatórios completos (constraints §11) + **"Sim" explícito** no Pacto de Honra.
-- **Parâmetros:** `nome_cliente`, `telefone_cliente` (só números), `data_iso`, `horario_preferido`, `bairro_cliente`, `spin`, `id_atendimento`.
-- **Depois:** sucesso → `Salvar_Contexto` → E8. Erro → transbordo (constraints §9).
-
-> **Descrição para colar no WTS:**
 > OBRIGATÓRIO: acione somente depois de ter o nome completo e o bairro do paciente, o telefone dele confirmado no Pacto de Honra, e o "Sim" explícito ao Pacto. O telefone chega pelo WhatsApp: confirme, não pergunte. O telefone vai apenas com números. Fique em silêncio após acionar e aguarde o retorno. Somente com retorno de SUCESSO o agendamento está confirmado, nunca confirme ao paciente antes disso. No campo de resumo, escreva para o dentista: a dor relatada, uma frase marcante nas palavras do próprio paciente, o nível de urgência e o que motivou o contato. Se o paciente pediu um profissional específico, registre a preferência nesse mesmo campo. Após o sucesso, grave a memória com Salvar_Contexto e siga para a finalização. Em caso de erro, avise que houve um probleminha técnico e transfira para a Emily.
 > **Executar sem responder ao cliente:** NÃO
 
+- **Parâmetros:** `nome_cliente`, `telefone_cliente` (só números), `data_iso`, `horario_preferido`, `bairro_cliente`, `spin`, `id_atendimento`.
+- **Depois:** sucesso → `Salvar_Contexto` → E8. Erro → transbordo (constraints §9).
+
 ### 1.3 `remarcar_agendamento`
 
-- **Pré-condição:** data/hora **original** confirmada + nova data validada por `verificar_disponibilidade` + "Sim" no Pacto atualizado + **1 tentativa de retenção já feita** (E6).
-- **Parâmetros:** `data_antiga_iso`, `data_iso`, `horario_preferido`, `telefone_cliente`, `id_atendimento`.
-
-> **Descrição para colar no WTS:**
 > Acione somente com a data e hora ORIGINAL do agendamento e a NOVA data desejada, ambas confirmadas. Se a data original já estiver na conversa ou no contexto lido, use direto, sem reperguntar. Antes de acionar, valide a nova data com verificar_disponibilidade. Nunca acione sem antes tentar ao menos uma vez manter o horário original. Fique em silêncio e aguarde o retorno. Após sucesso, grave a memória e siga para a finalização.
 > **Executar sem responder ao cliente:** NÃO
 
+- **Parâmetros:** `data_antiga_iso`, `data_iso`, `horario_preferido`, `telefone_cliente`, `id_atendimento`.
+
 ### 1.4 `cancelar_agendamento`
 
-- **Pré-condição:** as **3 tentativas** de retenção do E6 esgotadas + confirmação final do paciente.
-- **Parâmetros:** `data_iso` do agendamento, `telefone_cliente`, `id_atendimento`.
-
-> **Descrição para colar no WTS:**
 > Acione somente após as três tentativas obrigatórias de retenção sem sucesso e após o paciente confirmar o cancelamento. Nunca cancele na primeira solicitação. Se a data do agendamento já estiver na conversa ou no contexto lido, use direto, apenas confirmando com o paciente. Fique em silêncio e aguarde o retorno. Após sucesso, grave a memória e siga para a finalização com a porta aberta.
 > **Executar sem responder ao cliente:** NÃO
 
+- **Parâmetros:** `data_iso` do agendamento, `telefone_cliente`, `id_atendimento`.
+
 ### 1.5 `verificar_agendamento_paciente`
 
-- **Pré-condição:** o paciente perguntou sobre um agendamento existente (E7).
-- **Parâmetros:** `nome_cliente` e/ou `telefone_cliente`, `id_atendimento`.
-- **Depois:** os 4 cenários do E7 (ativo / paciente antigo / nenhum / erro).
-
-> **Descrição para colar no WTS:**
 > Acione quando o paciente perguntar sobre um agendamento existente. Fique em silêncio e aguarde o retorno. Responda apenas com o que o retorno trouxe, nunca invente data, horário ou profissional. Se não houver agendamento, informe e ofereça agendar a avaliação. Se o retorno indicar que a pessoa já é paciente antigo da Scopel, avise que vai direcionar e acione a transferência para o setor de pacientes.
 > **Executar sem responder ao cliente:** NÃO
+
+- **Parâmetros:** `nome_cliente` e/ou `telefone_cliente`, `id_atendimento`.
+- **Retorno usado:** alimenta os 4 cenários do E7 (ativo / paciente antigo / nenhum / erro).
 
 ---
 

@@ -54,12 +54,9 @@ O sinal que importa aqui é **comportamental, não uma palavra específica**: o 
 
 > Isso não é "insistir" (que é pedir mais informação com outra pergunta) — é dar um respiro no ritmo antes de empurrar a oferta, mesmo que o próximo input do lead continue curto.
 
-### Encaminhamentos
+### Saída
 
-- Implicação verbalizada, lead engajado → **E3**
-- Implicação verbalizada, mas em padrão de engajamento baixo → **E3**, com o turno de acolhimento acima antes da projeção
-- Hesitação ou objeção → **E9**
-- Pedido direto de horário → **E10**
+Implicação verbalizada → **E3**. Se o lead estiver em padrão de engajamento baixo, o turno de acolhimento acima vem antes da projeção. Desvios por intenção do paciente: regra de trânsito do E0.
 
 ---
 

@@ -64,11 +64,9 @@ Se cabe no turno e é relevante para o que a pessoa disse, um diferencial refor�
 
 ❌ Nunca improvisar número.
 
-### 5. Encaminhamentos
+### 5. Saída
 
-- Aceitou → **E4**
-- Hesitou, questionou preço com resistência, pediu para pensar → **E9**
-- Pediu para agendar sem responder a projeção → **E4** direto, sem insistir na projeção
+Aceitou → **E4**. Pediu para agendar sem responder a projeção → **E4** direto, sem insistir. Desvios por intenção do paciente: regra de trânsito do E0.
 
 ---
 
