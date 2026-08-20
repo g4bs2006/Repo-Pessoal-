@@ -13,6 +13,13 @@ build/
 *.pem
 *.key
 
+# Config e workflow gerado das clinicas: contem a chave de API da Clinicorp
+# em texto puro (subscriber_id + api_key no bloco CONFIG do no de Code).
+# A fonte da verdade e o config_<clinica>.json local; o workflow se regera
+# a partir dele com scripts/gerar_workflow.js.
+01_Clinicas/**/n8n/config_*.json
+01_Clinicas/**/n8n/agendamento_*.json
+
 # Ferramentas locais
 .claude/
 .obsidian/
@@ -25,7 +32,11 @@ build/
 *.log
 *.tmp
 Thumbs.db
+desktop.ini
 .DS_Store
+
+# Logs de auditoria de scripts que escrevem em sistemas externos (n8n, etc.)
+**/logs/
 
 # Projetos (repositorios proprios / trabalho local)
 02_Projetos/

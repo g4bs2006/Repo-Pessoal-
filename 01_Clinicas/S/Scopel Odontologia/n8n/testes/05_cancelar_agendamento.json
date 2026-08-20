@@ -1,0 +1,7 @@
+{
+  "acao_fluxo": "cancelar_agendamento",
+  "id_atendimento": "TESTE-SCOPEL-001",
+  "telefone_cliente": "41999990000",
+  "data_iso": "2026-08-26",
+  "horario_preferido": "14:00"
+}

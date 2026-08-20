@@ -1,0 +1,10 @@
+{
+  "acao_fluxo": "realizar_agendamento",
+  "id_atendimento": "TESTE-SCOPEL-001",
+  "nome_cliente": "Paciente Teste",
+  "telefone_cliente": "41999990000",
+  "bairro_cliente": "Praia de Leste",
+  "data_iso": "2026-08-24",
+  "horario_preferido": "09:00",
+  "spin": "DOR: mastigacao, prótese solta. URGENCIA: alta. Chegou por indicação."
+}
