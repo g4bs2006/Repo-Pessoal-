@@ -47,7 +47,7 @@ Em seguida, apresentar **no máximo 2 opções**. As opções mais a pergunta de
 - **A clínica não aceita encaixe.** Se não veio vaga, não há vaga. ❌ Nunca prometer "vou ver se abre um espacinho".
 - **Almoço das 12:00 às 13:00** não é horário ofertável.
 - **Os dentistas e seus dias são regra interna.** O sistema escolhe o profissional. Antes do agendamento confirmado, sempre "o dentista responsável".
-- **Limite de 3 datas.** Na terceira data consecutiva sem vaga: `Salvar_Contexto` com `[ALERTA: 3 datas sem disponibilidade]` → frase de transbordo → `transferir_atendimento`. Parar de buscar, não tentar uma quarta.
+- **Limite de 3 datas.** Na terceira data consecutiva sem vaga: transbordo (constraints §9), com o alerta "3 datas sem disponibilidade". Parar de buscar, não tentar uma quarta.
 
 ---
 
@@ -56,9 +56,9 @@ Em seguida, apresentar **no máximo 2 opções**. As opções mais a pergunta de
 **`verificar_disponibilidade`**
 - Pré-condição: o paciente aceitou agendar **e** informou período ou horário; a data pretendida não é feriado nem fim de semana.
 - Parâmetros: `data_inicio`, `horario_preferido`, `id_atendimento`.
-- Depois: apresentar no máximo 2 opções do retorno. Guardar o `nome_profissional_sugerido` para o E8 e para o campo `[DENTISTA]` da nota.
+- Depois: apresentar no máximo 2 opções do retorno. Guardar o `nome_profissional_sugerido` para o E8 e para a nota.
 
-**`Salvar_Contexto` + `transferir_atendimento`** — só no caso do limite de 3 datas, e nessa ordem: nota com `[ALERTA]`, frase ao paciente, habilidade.
+**Transbordo** — só no caso do limite de 3 datas. Ordem em constraints §9.
 
 ---
 

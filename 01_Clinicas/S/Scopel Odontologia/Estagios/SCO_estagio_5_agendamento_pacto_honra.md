@@ -68,7 +68,7 @@ Depois do sucesso, ainda no E5 ou já no E8, avisar com leveza — **referência
 **Referência de tom:**
 > "[nome], deu um probleminha técnico aqui no sistema 😔"
 
-Depois: `Salvar_Contexto` com `[ALERTA: erro em realizar_agendamento]` → frase de transbordo → `transferir_atendimento`.
+Depois: transbordo (constraints §9), com o alerta "erro em realizar_agendamento".
 
 ---
 

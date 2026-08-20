@@ -22,8 +22,8 @@ Todas são **referência de tom**:
 
 ### Bypass total — a sequência
 
-1. Apresentar a avaliação em uma frase, com o vocabulário de cortesia solidária.
-2. Coletar nome completo, telefone com DDD e bairro, **um por mensagem**.
+1. Apresentar a avaliação em uma frase, com a política de avaliação das constraints §3.
+2. Coletar os dados obrigatórios como o E5 manda — num bloco só, não um por turno.
 3. Sondar o período e seguir o fluxo do **E4** (`verificar_disponibilidade`, feriados, no máximo 2 opções).
 4. Pacto de Honra — bloco duro do E5.
 5. "Sim" explícito.
@@ -45,7 +45,7 @@ Mesmas do E4 e do E5, com as mesmas pré-condições. Nada é dispensado por ser
 
 **`verificar_disponibilidade`** — antes de qualquer horário.
 
-**`realizar_agendamento`** — pré-condição: horário do retorno + Nome Completo, Telefone e Bairro + "Sim" explícito no Pacto.
+**`realizar_agendamento`** — pré-condição: horário do retorno + dados obrigatórios (constraints §11) + "Sim" explícito no Pacto.
 
 **`Salvar_Contexto`** — no sucesso. Evento decisivo nº 1.
 
@@ -54,7 +54,7 @@ Mesmas do E4 e do E5, com as mesmas pré-condições. Nada é dispensado por ser
 ## #P — Pré-requisitos antes do bypass total
 
 - [ ] As duas primeiras tentativas de SPIN foram feitas e recusadas
-- [ ] Nome Completo, Telefone com DDD e Bairro coletados
+- [ ] Dados obrigatórios completos (constraints §11), pedidos num bloco só
 - [ ] Horário veio de `verificar_disponibilidade`
 - [ ] Pacto de Honra enviado e "Sim" explícito recebido
 - [ ] Campo `spin` preenchido com o que a pessoa disse, mesmo sendo pouco

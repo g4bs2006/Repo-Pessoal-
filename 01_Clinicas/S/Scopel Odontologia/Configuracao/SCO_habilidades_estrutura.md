@@ -1,6 +1,6 @@
 # HABILIDADES E ESTRUTURA — Clarisse | Scopel Odontologia
 
-Padrão Luna (v4). **Inventário fechado:** a Clarisse aciona exatamente **9 habilidades**. Qualquer coisa fora desta lista é erro de configuração.
+Padrão Luna (v4). **Inventário fechado:** a Clarisse aciona exatamente **11 habilidades** — 8 configuradas no WTS mais as 3 nativas de sistema. Qualquer coisa fora desta lista é erro de configuração.
 
 **Regra de silêncio:** toda habilidade tem "Executar sem responder ao cliente" = **SIM**, exceto as 5 de agendamento, que aguardam retorno visível para a Clarisse poder falar sobre ele.
 
@@ -20,7 +20,9 @@ Padrão Luna (v4). **Inventário fechado:** a Clarisse aciona exatamente **9 hab
 | 6 | `Ler_Contexto` | Acionar API | SIM | **só E0, E7, E12** |
 | 7 | `Salvar_Contexto` | Alterar campo do contato → Notas Internas | SIM | **só os 6 eventos decisivos** |
 | 8 | `alterar_campo_contato (Nome)` | Alterar campo do contato | SIM | E0, E1 |
-| 9 | `transferir_atendimento` · `transferir_atendimento_paciente` · `concluir_atendimento` | Sistema | — | conforme regra |
+| 9 | `transferir_atendimento` | Sistema | — | transbordo, constraints §9 |
+| 10 | `transferir_atendimento_paciente` | Sistema | — | E0 Caminho C, E7 cenário B |
+| 11 | `concluir_atendimento` | Sistema | — | E8, e E9 na 3ª objeção |
 
 ❌ **Etiquetas do contato: nenhuma.** A Clarisse não aplica etiqueta e não move card. Quem faz isso é o n8n, a partir do sucesso real na Clinicorp. Ver a seção 5.
 
@@ -43,12 +45,12 @@ As 5 apontam para o mesmo webhook n8n, diferenciadas por `acao_fluxo`.
 
 ### 1.2 `realizar_agendamento`
 
-- **Pré-condição:** horário confirmado por `verificar_disponibilidade` + Nome Completo, Telefone com DDD e Bairro confirmados + **"Sim" explícito** no Pacto de Honra.
+- **Pré-condição:** horário confirmado por `verificar_disponibilidade` + dados obrigatórios completos (constraints §11) + **"Sim" explícito** no Pacto de Honra.
 - **Parâmetros:** `nome_cliente`, `telefone_cliente` (só números), `data_iso`, `horario_preferido`, `bairro_cliente`, `spin`, `id_atendimento`.
-- **Depois:** sucesso → `Salvar_Contexto` → E8. Erro → frase de probleminha técnico → `Salvar_Contexto` com `[ALERTA]` → `transferir_atendimento`.
+- **Depois:** sucesso → `Salvar_Contexto` → E8. Erro → transbordo (constraints §9).
 
 > **Descrição para colar no WTS:**
-> OBRIGATÓRIO: acione somente após coletar e confirmar todos os dados obrigatórios (Nome Completo, Telefone com DDD e Bairro ou balneário) e após o paciente responder "Sim" ao Pacto de Honra. O telefone vai apenas com números. Fique em silêncio após acionar e aguarde o retorno. Somente com retorno de SUCESSO o agendamento está confirmado, nunca confirme ao paciente antes disso. No campo de resumo, escreva para o dentista: a dor relatada, uma frase marcante nas palavras do próprio paciente, o nível de urgência e o que motivou o contato. Se o paciente pediu um profissional específico, registre a preferência nesse mesmo campo. Após o sucesso, grave a memória com Salvar_Contexto e siga para a finalização. Em caso de erro, avise que houve um probleminha técnico e transfira para a Emily.
+> OBRIGATÓRIO: acione somente depois de ter o nome completo e o bairro do paciente, o telefone dele confirmado no Pacto de Honra, e o "Sim" explícito ao Pacto. O telefone chega pelo WhatsApp: confirme, não pergunte. O telefone vai apenas com números. Fique em silêncio após acionar e aguarde o retorno. Somente com retorno de SUCESSO o agendamento está confirmado, nunca confirme ao paciente antes disso. No campo de resumo, escreva para o dentista: a dor relatada, uma frase marcante nas palavras do próprio paciente, o nível de urgência e o que motivou o contato. Se o paciente pediu um profissional específico, registre a preferência nesse mesmo campo. Após o sucesso, grave a memória com Salvar_Contexto e siga para a finalização. Em caso de erro, avise que houve um probleminha técnico e transfira para a Emily.
 > **Executar sem responder ao cliente:** NÃO
 
 ### 1.3 `remarcar_agendamento`
@@ -96,31 +98,18 @@ As 5 apontam para o mesmo webhook n8n, diferenciadas por `acao_fluxo`.
 ❌ **Nunca** como "Passo 0" de E1–E6, E8–E11. O histórico do atendimento em curso já está na janela do modelo, e o retorno da API é sempre mais antigo do que a conversa.
 
 > **Descrição para colar no WTS:**
-> OBRIGATÓRIO: acione uma única vez, quando o paciente enviar a primeira mensagem do atendimento, antes de qualquer resposta ou saudação. Execute em silêncio total e aguarde o retorno completo. O retorno traz o que aconteceu em atendimentos anteriores. Use-o para decidir a abertura: se indicar agendamento ativo, não repita o funil de vendas e ofereça apoio; se trouxer histórico, retome de onde parou sem pedir o nome de novo; se vier vazio, trate como paciente novo. Nunca invente dados, baseie-se apenas no retorno. Não acione novamente durante o mesmo atendimento, a conversa em andamento você já conhece.
+> OBRIGATÓRIO: acione **uma única vez por atendimento**, sempre antes de enviar qualquer mensagem, em três situações: (1) o paciente enviou a primeira mensagem do atendimento; (2) a primeira coisa que ele mandou foi uma pergunta sobre um agendamento que já existe; (3) você vai iniciar um follow-up por conta própria, sem o paciente ter escrito. Execute em silêncio total e aguarde o retorno completo. O retorno traz o que aconteceu em atendimentos anteriores. Use-o para decidir a abertura: se indicar agendamento ativo, não repita o funil de vendas e ofereça apoio; se trouxer histórico, retome de onde parou sem pedir o nome de novo; se vier vazio, trate como paciente novo; se for follow-up, leia o texto da última mensagem que você enviou e não repita a mesma. Nunca invente dados, baseie-se apenas no retorno. Depois de ler uma vez, não acione de novo no mesmo atendimento — a conversa em andamento você já conhece.
 > **Executar sem responder ao cliente:** SIM
 
 ### 2.2 `Salvar_Contexto` (Alterar campo do contato → Notas Internas)
 
-**Os 6 momentos, e nenhum outro:**
-
-| # | Momento | Gatilho |
-|---|---|---|
-| 1 | Agendamento confirmado | sucesso de `realizar_agendamento` (E5/E10) |
-| 2 | Remarcação confirmada | sucesso de `remarcar_agendamento` (E6) |
-| 3 | Cancelamento confirmado | sucesso de `cancelar_agendamento` (E6) |
-| 4 | Objeção irredutível | lead esfriou no E9, sem agendamento |
-| 5 | Finalização | E8, depois da despedida e **antes** de `concluir_atendimento` |
-| 6 | Follow-up enviado | E12, com `[ÚLTIMA_MENSAGEM_CLARISSE]` atualizado |
-
-**+ sempre antes de todo transbordo**, gravando `[ALERTA: motivo]`.
+**Quando acionar:** nos 6 momentos decisivos, **e sempre antes de todo transbordo**. A lista dos 6 e a estrutura da nota são do E11 — ver `SCO_estagio_11_memoria.md`.
 
 ❌ Não salvar em transição de estágio. Estado no meio do funil é transitório e nunca vai ser lido.
 
 > **Descrição para colar no WTS:**
 > OBRIGATÓRIO: esta habilidade grava a memória de longo prazo do paciente. Acione-a quando o atendimento chegar a uma definição: agendamento confirmado, remarcação, cancelamento, objeção sem retorno, finalização, ou follow-up enviado. Acione também antes de transferir para um humano, registrando o motivo do alerta. Nunca encerre um atendimento sem executá-la. Preencha o campo de texto conforme as regras do Estágio 11.
 > **Executar sem responder ao cliente:** SIM
-
-Estrutura obrigatória do campo `text`: ver `SCO_estagio_11_memoria.md`.
 
 ---
 
@@ -138,9 +127,7 @@ Estrutura obrigatória do campo `text`: ver `SCO_estagio_11_memoria.md`.
 
 ### 4.1 `transferir_atendimento`
 
-Escalonamento por atrito ou erro. **Ordem inviolável:** `Salvar_Contexto` com `[ALERTA]` → **frase de transbordo** → habilidade. A frase vem antes, nunca depois.
-
-Situações e a frase exata: `SCO_regras_sistema_constraints.md`, seção 9. O transbordo é sempre pelo nome da humana, "a Emily" ou "a Gisele", nunca "um humano".
+Escalonamento por atrito ou erro. A ordem, as situações e a frase exata são de `SCO_regras_sistema_constraints.md`, seção 9.
 
 ### 4.2 `transferir_atendimento_paciente`
 
@@ -161,35 +148,23 @@ Se qualquer uma destas aparecer em algum arquivo do agente, é erro de configura
 
 | Não existe | Onde a função foi |
 |---|---|
-| `Registrar_Origem` | campo `[ORIGEM]` da nota + automação de origem de lead no n8n (`SESSION_NEW`) |
+| `Registrar_Origem` | a origem, registrada na nota + automação de origem de lead no n8n (`SESSION_NEW`) |
 | `Confirmar_Compromisso_Honra` | o próprio Pacto de Honra — o "Sim" explícito **é** o compromisso, e é pré-condição de `realizar_agendamento` |
 | `tag_Agendou` | n8n, cadeia Agendar (`agendado_contact_tag_id`) |
 | `tag_Remarcou` | n8n, cadeia Remarcar (`remarcado_contact_tag_id`) |
 | `tag_Cancelou` | n8n, cadeia Cancelar (`cancelado_contact_tag_id`) |
 | `Cliente Agendou - IA` (kanban) | n8n move o card para `agendado_step_id` e aplica `ia_card_tag_id` |
-| `tag_Campanha[Nome]` | campo `[ORIGEM]` da nota |
-| `Marcar_Dor_Estetica` / `Marcar_Dor_Mastigacao` | campo `[DOR]` da nota, com as palavras do lead |
-| `Classificar_Urgencia_Alta` / `Classificar_Urgencia_Baixa` | campo `[URGÊNCIA]` da nota |
-| `tag_Alerta` | campo `[ALERTA]` da nota, gravado antes do transbordo |
+| `tag_Campanha[Nome]` | a origem, registrada na nota |
+| `Marcar_Dor_Estetica` / `Marcar_Dor_Mastigacao` | a dor, narrada na nota com as palavras do lead |
+| `Classificar_Urgencia_Alta` / `Classificar_Urgencia_Baixa` | a urgência e seu motivo, narrados na nota |
+| `tag_Alerta` | o motivo do alerta, registrado na nota antes do transbordo |
 | `Ler_Etiqueta` | removida — o `Ler_Contexto` do E0 já traz o que a Clarisse precisa para escolher o caminho |
 | `Lead Esfriando` | permanece **fora** do agente: é gatilho de fluxo externo, nunca foi habilidade do prompt |
 
-> A única reintrodução aceitável seria `tag_Alerta`, se a Scopel precisar do alerta visível como etiqueta colorida no painel. É a única sem evento equivalente no n8n, porque transbordo não passa pela Clinicorp. Nesse caso: `tag_Alerta` → frase → `transferir_atendimento`, e o `[ALERTA]` na nota continua. Decidir com a clínica, não sozinho.
+> A única reintrodução aceitável seria `tag_Alerta`, se a Scopel precisar do alerta visível como etiqueta colorida no painel. É a única sem evento equivalente no n8n, porque transbordo não passa pela Clinicorp. Nesse caso ela entra **dentro** da ordem de transbordo das constraints §9 (nota → frase → habilidades), somando-se ao registro do alerta na nota, nunca substituindo-o. Decidir com a clínica, não sozinho.
 
 ---
 
-## 6. Sequências obrigatórias
+## 6. Nota de arquitetura
 
-```
-Agendamento:      verificar_disponibilidade → Pacto → "Sim" → realizar_agendamento
-                  → [sucesso] → Salvar_Contexto → E8
-Remarcação:       resistência 1x → verificar_disponibilidade → Pacto → "Sim"
-                  → remarcar_agendamento → [sucesso] → Salvar_Contexto → E8
-Cancelamento:     3 tentativas de retenção → cancelar_agendamento
-                  → [sucesso] → Salvar_Contexto → E8
-Finalização:      despedida → Salvar_Contexto → concluir_atendimento
-Transbordo:       Salvar_Contexto com [ALERTA] → frase → transferir_atendimento
-Paciente antigo:  frase de direcionamento → transferir_atendimento_paciente
-```
-
-Nenhuma sequência tem mais de 4 elos. O n8n aplica etiqueta e move card em paralelo, e a Clarisse não faz nada disso.
+Nenhuma sequência desta lista tem mais de 4 elos — a pré-condição e o "Depois" de cada habilidade acima já a descrevem por inteiro, e é ali que ela vive. O n8n aplica etiqueta e move card em paralelo; a Clarisse não faz nada disso.

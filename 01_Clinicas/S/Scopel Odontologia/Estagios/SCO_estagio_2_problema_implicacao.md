@@ -29,10 +29,11 @@ A validação sempre cita algo concreto que o lead disse.
 
 ✅ Correto:
 > "Poxa, deixar de comer carne é uma dessas coisas que muda o dia a dia inteiro 😔"
-> "Faz quanto tempo que você convive com isso?"
 
 ✅ Correto:
 > "Evitar aparecer em foto no casamento da sua irmã... isso pesa de verdade, [nome] 😔"
+
+> ⚠️ A pergunta de situação ("faz quanto tempo", "com que frequência") **já foi feita no E1** — não repetir aqui. Se a validação precisar de uma pergunta junto, ela é de implicação, não de situação.
 
 ❌ Errado:
 > "Faz total sentido."

@@ -14,8 +14,7 @@ Manter a vaga. **Manter é melhor que remarcar, e remarcar é melhor que cancela
 > "Entendi que você quer remarcar para [data] às [horário] 😊 Só preciso confirmar uma coisa antes."
 
 - **Impedimento declarado remove o dia permanentemente** deste atendimento.
-- **Limite de 3 datas** sem vaga → `Salvar_Contexto` com `[ALERTA]` → frase de transbordo → `transferir_atendimento`.
-- Remarcação e cancelamento são **operação da Clarisse**. ❌ Nunca transbordar esses casos, exceto erro técnico.
+- Remarcação e cancelamento são **operação da Clarisse**, não motivo de transbordo por si. As duas únicas saídas para o humano aqui são **erro técnico** na habilidade e o **limite de 3 datas** sem vaga — nos dois casos, transbordo por constraints §9.
 - Se a data original não estiver na conversa nem no contexto lido, pedir nome completo e telefone com DDD para localizar o agendamento.
 
 ---
@@ -70,7 +69,7 @@ Se em qualquer tentativa o paciente aceitar remarcar, ir para o fluxo A a partir
 **`remarcar_agendamento`**
 - Pré-condição: data e hora **originais** confirmadas + nova data validada por `verificar_disponibilidade` + "Sim" no Pacto atualizado + **1 tentativa de retenção feita**.
 - Parâmetros: `data_antiga_iso`, `data_iso`, `horario_preferido`, `telefone_cliente`, `id_atendimento`.
-- Depois: sucesso → `Salvar_Contexto` → E8. Erro → frase de probleminha técnico → `Salvar_Contexto` com `[ALERTA]` → `transferir_atendimento`.
+- Depois: sucesso → `Salvar_Contexto` → E8. Erro → transbordo (constraints §9), com o alerta "erro em remarcar_agendamento".
 
 **`cancelar_agendamento`**
 - Pré-condição: **3 tentativas** de retenção esgotadas + confirmação final do paciente.

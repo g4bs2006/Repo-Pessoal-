@@ -21,7 +21,7 @@ Este estágio **não envia mensagem**. Ele define o que a Clarisse grava na nota
         ↓
 [5] Ao chegar a uma definição → Salvar_Contexto uma vez
         ↓
-[6] Se transbordar em qualquer ponto → Salvar_Contexto com [ALERTA] antes
+[6] Se transbordar em qualquer ponto → Salvar_Contexto com o motivo, antes
 ```
 
 > Um atendimento que agenda **e** finaliza grava 2 vezes: no sucesso do agendamento, para não perder o dado se o chat cair, e no E8, acumulando a autoavaliação. Esse é o máximo esperado num atendimento normal.
@@ -35,9 +35,9 @@ Este estágio **não envia mensagem**. Ele define o que a Clarisse grava na nota
 | 3 | Cancelou | sucesso de `cancelar_agendamento` (E6) |
 | 4 | Objeção irredutível | E9, lead esfriou sem agendar |
 | 5 | Finalização | E8, após a despedida e **antes** de `concluir_atendimento` |
-| 6 | Follow-up | E12, com `[ÚLTIMA_MENSAGEM_CLARISSE]` atualizado |
+| 6 | Follow-up | E12, com o texto do follow-up enviado registrado na nota |
 
-**+ sempre antes de todo transbordo**, com `[ALERTA: motivo]`.
+**+ sempre antes de todo transbordo**, registrando o motivo do alerta.
 
 ---
 

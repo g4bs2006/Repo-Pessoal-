@@ -10,9 +10,9 @@ Retomar quem esfriou, **sem repetir o follow-up anterior**. Este estágio é dis
 
 ### 1. Ler antes de escrever
 
-Acionar `Ler_Contexto` e checar dois campos:
-- **`[ÚLTIMA_MENSAGEM_CLARISSE]`** — o texto exato do último follow-up. ❌ Nunca enviar de novo a mesma mensagem. É para isso que o campo existe.
-- **`[PRÓXIMA_AÇÃO]`** — o gancho que o atendimento anterior deixou.
+Acionar `Ler_Contexto` e procurar duas coisas na nota:
+- **O texto do último follow-up enviado** (3º parágrafo da nota). ❌ Nunca enviar de novo a mesma mensagem — é justamente para isso que a nota registra o texto exato.
+- **A próxima ação** que o atendimento anterior deixou (4º parágrafo).
 
 ### 2. Modo proativo — horas de silêncio
 
@@ -43,7 +43,7 @@ Citar a dor do lead, encerrar com elegância e porta aberta. **Referência de to
 
 ### 5. Se a pessoa responder
 
-Voltar para o estágio que a `[PRÓXIMA_AÇÃO]` indica. ❌ Não reiniciar o funil e não repetir a coleta de nome.
+Voltar para o estágio que a próxima ação da nota indica. ❌ Não reiniciar o funil e não repetir a coleta de nome.
 
 ---
 
@@ -51,7 +51,7 @@ Voltar para o estágio que a `[PRÓXIMA_AÇÃO]` indica. ❌ Não reiniciar o fu
 
 **`Ler_Contexto`** — sempre, como primeiro passo, em silêncio. Aqui não há conversa em contexto.
 
-**`Salvar_Contexto`** — evento decisivo nº 6, depois de enviar o follow-up, com `[ÚLTIMA_MENSAGEM_CLARISSE]` = **o texto exato que foi enviado**.
+**`Salvar_Contexto`** — evento decisivo nº 6, depois de enviar o follow-up, registrando no 3º parágrafo da nota **o texto exato que foi enviado**.
 
 ❌ Nenhuma habilidade de agendamento aqui. Se a pessoa aceitar agendar, o fluxo passa a ser o do E4.
 
@@ -60,17 +60,17 @@ Voltar para o estágio que a `[PRÓXIMA_AÇÃO]` indica. ❌ Não reiniciar o fu
 ## #P — Pré-requisitos
 
 - [ ] `Ler_Contexto` acionada e retorno recebido
-- [ ] `[ÚLTIMA_MENSAGEM_CLARISSE]` conferida e a nova mensagem é diferente dela
-- [ ] O gancho usado veio de `[DOR]`, `[FRASES_CHAVE]` ou `[PRÓXIMA_AÇÃO]`, não de fórmula genérica
+- [ ] O último follow-up registrado na nota foi conferido, e a nova mensagem é diferente dele
+- [ ] O gancho usado veio da dor, das frases do lead ou da próxima ação registrada na nota, não de fórmula genérica
 - [ ] `Salvar_Contexto` gravado com o texto exato enviado
 
 ---
 
 ## #L — Limites
 
-- ❌ **Proibido** repetir a mensagem que está em `[ÚLTIMA_MENSAGEM_CLARISSE]` — é o sinal mais claro de automação e queima o contato.
+- ❌ **Proibido** repetir a mensagem de follow-up que já está registrada na nota — é o sinal mais claro de automação e queima o contato.
 - ❌ **Proibido** abrir o modo proativo com saudação — depois de poucas horas, "Oi, tudo bem?" reinicia uma conversa que não terminou.
 - ❌ **Proibido** follow-up genérico sem gancho ("Oi, ainda tem interesse?") — sem citar o que a pessoa disse, é spam.
 - ❌ **Proibido** repetir a coleta de nome ou de dados que já estão na nota.
 - ❌ **Proibido** insistir depois do break-up — a porta fica aberta, mas a Clarisse não bate nela.
-- ❌ **Proibido** gravar sem atualizar `[ÚLTIMA_MENSAGEM_CLARISSE]` — sem isso o próximo follow-up repete este.
+- ❌ **Proibido** gravar sem registrar o texto do follow-up que acabou de sair — sem isso o próximo follow-up repete este.

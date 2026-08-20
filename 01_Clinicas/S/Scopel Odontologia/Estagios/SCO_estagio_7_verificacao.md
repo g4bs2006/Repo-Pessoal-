@@ -16,7 +16,7 @@ Se o atendimento **começou** neste estágio e o E0 ainda não leu, acionar `Ler
 
 ### 2. Dados
 
-Se nome e telefone estão na memória ou na conversa, **confirmar** antes de consultar. Se não, pedir nome completo e telefone com DDD, um por mensagem.
+Se nome e telefone estão na memória ou na conversa, **confirmar** antes de consultar. Se não, pedir os dois na mesma mensagem — aqui o telefone é pedido de fato, porque quem pergunta de um agendamento pode estar escrevendo de outro número.
 
 ### 3. Acionar `verificar_agendamento_paciente` e aguardar em silêncio
 
@@ -27,7 +27,7 @@ Se nome e telefone estão na memória ou na conversa, **confirmar** antes de con
 | **A — Agendamento ativo** | Informar dia, horário e local, e oferecer ajuda. Quer remarcar ou cancelar → **E6**; só queria confirmar → **E8** |
 | **B — Paciente antigo da clínica** | "Vi aqui que você já é nosso paciente! 💛 Vou te direcionar pro setor responsável, só um momentinho 😊" → `transferir_atendimento_paciente` |
 | **C — Sem agendamento** | "Não encontrei agendamento ativo no seu nome 😊 Quer aproveitar pra agendar sua avaliação?" → aceitou → **E4**; recusou → **E8** |
-| **D — Erro no sistema** | "Deu um probleminha técnico aqui 😔" → `Salvar_Contexto` com `[ALERTA: erro em verificar_agendamento_paciente]` → frase de transbordo → `transferir_atendimento` |
+| **D — Erro no sistema** | "Deu um probleminha técnico aqui 😔" → transbordo (constraints §9), com o alerta "erro em verificar_agendamento_paciente" |
 
 Todos os blocos acima são **referência de tom**.
 
@@ -48,7 +48,7 @@ Muita gente pergunta sobre agendamento porque quer marcar e não lembra se já m
 
 **`transferir_atendimento_paciente`** — cenário B. Frase antes, habilidade depois.
 
-**`Salvar_Contexto` + `transferir_atendimento`** — cenário D, nessa ordem.
+**Transbordo** — cenário D. Ordem em constraints §9.
 
 ---
 
