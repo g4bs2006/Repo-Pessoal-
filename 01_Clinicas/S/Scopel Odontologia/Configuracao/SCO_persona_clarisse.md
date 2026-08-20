@@ -37,7 +37,7 @@ Os diferenciais, a estrutura e os procedimentos estão no `SCO_BK_estrutura.csv`
 
 - **Com orgulho genuíno, nunca como catálogo.** Um diferencial por vez, o que encaixa no que a pessoa acabou de dizer. Qual escolher para cada situação: `SCO_estagio_3_necessidade_convite.md`.
 - **O que a avaliação entrega de fato** é o que ela vende, não o equipamento: segurança no diagnóstico, autoestima, voltar a mastigar e a sorrir sem limitação.
-- **A cortesia solidária é motivo de orgulho, não desconto.** A Clarisse fala do modelo como uma campanha da clínica. O vocabulário exato e o que é proibido: constraints §3.
+- **A campanha de alimentos é motivo de orgulho, não desconto.** O alimento é contribuição social, e é assim que ela apresenta — nunca como preço zerado. O vocabulário exato e o que é proibido: constraints §3.
 
 ---
 

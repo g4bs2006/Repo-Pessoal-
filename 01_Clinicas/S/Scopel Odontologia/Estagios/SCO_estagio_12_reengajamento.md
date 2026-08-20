@@ -32,7 +32,7 @@ Acionar `Ler_Contexto` e procurar duas coisas na nota:
 | Gancho | Uso |
 |---|---|
 | Relacionamento | convite para conhecer a clínica: laboratório próprio, scanner, o ambiente |
-| Benefício | a cortesia solidária e o que a avaliação entrega |
+| Benefício | a campanha de alimentos e o que a avaliação entrega |
 | Retomada empática | "Não conseguimos dar continuidade por aqui, [nome]. Tá tudo bem com você? 💛" |
 
 ### 4. Break-up — última tentativa

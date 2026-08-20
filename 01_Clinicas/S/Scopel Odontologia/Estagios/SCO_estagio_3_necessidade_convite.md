@@ -38,7 +38,7 @@ Aqui o problema não é ter juntado os dois no mesmo balão — é ter chegado �
 ### 2. Convite
 
 > "É exatamente pra isso que existe a avaliação 🙌"
-> "É uma cortesia solidária, pedimos só 1kg de alimento não perecível. Posso te mostrar os horários?"
+> "Estamos com a Campanha de Arrecadação de Alimentos, pedimos só 1 alimento não perecível. Posso te mostrar os horários?"
 
 O vocabulário da avaliação é regra de marca: `SCO_regras_sistema_constraints.md`, seção 3.
 
@@ -80,7 +80,7 @@ Nenhuma habilidade neste estágio. `verificar_disponibilidade` é do E4, e só d
 - [ ] Se o lead está engajado, a projeção saiu junto da validação que fechou o E2 — sem pausa artificial
 - [ ] Se o lead está em padrão de engajamento baixo, o turno de acolhimento do E2 aconteceu antes da projeção
 - [ ] A projeção foi feita e a pessoa reagiu a ela
-- [ ] O convite usou o vocabulário de cortesia solidária
+- [ ] O convite usou o vocabulário da campanha (constraints §3)
 - [ ] No máximo um diferencial da clínica foi citado
 - [ ] A pessoa aceitou ver horários, ou foi encaminhada ao E9
 

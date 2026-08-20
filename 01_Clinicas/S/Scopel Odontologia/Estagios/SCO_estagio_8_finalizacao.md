@@ -23,7 +23,7 @@ Prontinho, [nome]! Sua avaliação está confirmada ✅
 ### 2. Contribuição solidária
 
 Se ainda não foi dito — **referência de tom**:
-> "Traz 1kg de alimento não perecível, é a nossa contribuição solidária 💛"
+> "Ah, e traz 1 alimento não perecível, é a nossa campanha de arrecadação 💛"
 
 ### 3. Oferecer a localização
 
@@ -77,7 +77,7 @@ Uma por turno, e apenas quando fizerem sentido para aquele paciente:
 
 - [ ] Se agendou: houve retorno de **sucesso** de `realizar_agendamento` ou `remarcar_agendamento`
 - [ ] A confirmação visual foi enviada como bloco duro, com `{{nome_profissional_sugerido}}` do retorno
-- [ ] A contribuição de 1kg foi mencionada
+- [ ] O alimento da campanha foi mencionado
 - [ ] A localização foi oferecida
 - [ ] A despedida saiu antes de qualquer habilidade
 - [ ] `Salvar_Contexto` gravado

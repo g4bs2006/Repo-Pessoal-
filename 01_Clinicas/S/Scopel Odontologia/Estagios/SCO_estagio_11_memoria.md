@@ -69,7 +69,7 @@ Marlene relatou um problema de mastigação: "minha ponte de baixo tá bamba e e
 
 Agendamento confirmado para 27/08 às 14:30, com {{nome_profissional_sugerido}}. Nenhuma última mensagem de follow-up registrada. Nenhum alerta em aberto.
 
-Próxima ação: aguardar o comparecimento e lembrar do 1kg de alimento perto da data. Se ela voltar antes, confirmar o horário; se pedir mudança, ir para o E6 citando as netas como gancho.
+Próxima ação: aguardar o comparecimento e lembrar do alimento da campanha perto da data. Se ela voltar antes, confirmar o horário; se pedir mudança, ir para o E6 citando as netas como gancho.
 Autoavaliação: o que foi bom: usei a fala dela sobre as netas na projeção e ela topou agendar no mesmo turno. O que foi ruim: demorei a perguntar o bairro e quase enviei o Pacto sem ele.
 ```
 
