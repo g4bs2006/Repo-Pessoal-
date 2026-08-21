@@ -14,7 +14,7 @@ Criar todos os arquivos do agente em `01_Clinicas/[ano-mês]/[cliente]/`:
 - Database: BK_estrutura, BK_localizacao, BK_objecoes, BK_feriados
 - Prompts: persona + estágios E0 a E12
 
-Referência: `03_Documentacao/Skills/agente-odontologico/SKILL.md`
+Referência: `03_Documentacao/Skills/agentes-odontologicos/agente-odontologico/SKILL.md`
 
 ### 2. Criação das etiquetas
 Criar e configurar as etiquetas (tags) do cliente na plataforma de atendimento (Helena/WTS):

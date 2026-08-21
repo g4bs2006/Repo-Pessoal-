@@ -29,7 +29,7 @@ Antes de gerar as 3 perguntas, ler os arquivos do cliente para entender o que j�
 **Para construção nova:**
 1. Verificar se existe `onboarding_*.json` na pasta do cliente — contexto do briefing
 2. Verificar se existe pasta de outro agente da mesma clínica — reutilizar padrões
-3. Verificar skill `03_Documentacao/Skills/agente-odontologico/SKILL.md` — versão atual do template
+3. Verificar skill `03_Documentacao/Skills/agentes-odontologicos/agente-odontologico/SKILL.md` — versão atual do template
 
 **Para manutenção/bug:**
 1. Ler o arquivo específico que precisa ser mudado

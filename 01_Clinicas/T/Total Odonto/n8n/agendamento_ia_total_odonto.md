@@ -205,7 +205,7 @@ Campos aceitos no body (o node de normalização aceita aliases herdados do padr
 
 ## 12. Referência Cruzada
 
-- Guia geral do padrão n8n v3: `03_Documentacao/Skills/agente-odontologico/references/integracao-n8n.md`
+- Guia geral do padrão n8n v3: `03_Documentacao/Skills/agentes-odontologicos/agente-odontologico/references/integracao-n8n.md`
 - Workflow de referência mais completo (estrutura de nodes): `01_Clinicas/V/Vassoler/n8n/agendamento_ia_vassoler.json`
 - Workflow de referência com lógica de fallback entre profissionais (não aplicável à Total Odonto, mas útil para entender a estrutura de nodes): `01_Clinicas/O/OB Clinic/n8n/correto.md`
 - Documentação oficial dos endpoints Clinicorp usados: `03_Documentacao/clinicorp-api-docs/00_autenticacao.md`, `05_appointment.md`, `09_patient.md`, `11_professional.md`
